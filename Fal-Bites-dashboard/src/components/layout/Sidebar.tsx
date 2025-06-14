@@ -17,11 +17,11 @@ import {
   // Trophy,
   // ListTree,
   // ClipboardList,
-  CheckCircle,
+  // CheckCircle,
   // MapPinOff,
   Briefcase,
   // HandCoins,
-  // ShieldCheck,
+  ShieldCheck,
   // Star,
   // Box
 } from 'lucide-react';
@@ -49,16 +49,16 @@ const menuItems = [
     icon: Truck, // Lucide icon suitable for delivery or logistics
     label: 'Delivery Partner'
   },
-  // {
-  //   path: '/delivery-partner-verification',
-  //   icon: ShieldCheck, // symbolizes verification, approval, trust
-  //   label: 'Partner Verification',
-  // },
   {
-    path: '/deliver-attendance',
-    icon: CheckCircle,
-    label: 'Deliver Attendance'
+    path: '/delivery-partner-verification',
+    icon: ShieldCheck, // symbolizes verification, approval, trust
+    label: 'Partner Verification',
   },
+  // {
+  //   path: '/deliver-attendance',
+  //   icon: CheckCircle,
+  //   label: 'Deliver Attendance'
+  // },
 
   // Products & Subscriptions
   {

@@ -48,7 +48,7 @@ interface User {
     userType: string
     gender?: string
     role: string
-    tag: string // Can be "user", "customer", "Customers", "COD", "Failed", "Renewal", "Expired"  Customers all
+    tag: string
     createdAt: string
     updatedAt: string
     dob?: string
@@ -286,10 +286,6 @@ export default function UsersPage() {
     const [apiError, setApiError] = useState<string | null>(null)
     const [apiSuccess, setApiSuccess] = useState<string | null>(null)
     const [totalUsers, setTotalUsers] = useState(0)
-    const [totalCustomers, setTotalCustomers] = useState(0)
-    const [userFilter, setUserFilter] = useState<
-        "all" | "user" | "customer" | "COD" | "Failed" | "Renewal" | "Expired"
-    >("all")
 
     // Form for wallet update
     const {
@@ -310,12 +306,10 @@ export default function UsersPage() {
         const fetchUsers = async () => {
             try {
                 setIsLoading(true)
-                // Remove pagination parameters to get all users at once
                 const response = await axios.get<ApiResponse>(`${API_URL}/users?limit=1000`)
                 if (response.data && response.data.success) {
                     setUsers(response.data.data)
                     setTotalUsers(response.data.totalUsers)
-                    setTotalCustomers(response.data.totalCustomer)
                 } else {
                     setApiError(response.data.message || "Failed to fetch users")
                     toast.error("Failed to fetch users")
@@ -330,24 +324,21 @@ export default function UsersPage() {
         }
 
         fetchUsers()
-    }, []) // Remove currentPage dependency
+    }, [])
 
-    // Filter users based on search query and user filter
+    // Filter users based on search query only
     const filteredUsers = users.filter((user) => {
         const searchLower = searchQuery.toLowerCase()
-        const matchesSearch =
+        return (
             user.name?.toLowerCase().includes(searchLower) ||
             user.mobileNumber.includes(searchQuery) ||
             user.email?.toLowerCase().includes(searchLower) ||
             user.referCode.toLowerCase().includes(searchLower) ||
             user.userType.toLowerCase().includes(searchLower) ||
-            user.tag.toLowerCase().includes(searchLower) || // Add search by tag
+            user.tag.toLowerCase().includes(searchLower) ||
             user.assignedFranchiseId?.name.toLowerCase().includes(searchLower) ||
             user.assignedFranchiseId?.cityName.toLowerCase().includes(searchLower)
-
-        const matchesFilter = userFilter === "all" || user.tag === userFilter
-
-        return matchesSearch && matchesFilter
+        )
     })
 
     // Handle user detail view
@@ -360,7 +351,7 @@ export default function UsersPage() {
     const handleWalletUpdate = (user: User) => {
         setSelectedUser(user)
         setWalletUpdateOpen(true)
-        reset() // Reset form fields
+        reset()
     }
 
     // Submit wallet update
@@ -378,7 +369,6 @@ export default function UsersPage() {
             })
 
             if (response.data && response.data.success) {
-                // Update user in state
                 const updatedUsers = users.map((user) =>
                     user._id === selectedUser._id ? { ...user, wallet: response.data.data.wallet } : user,
                 )
@@ -407,11 +397,9 @@ export default function UsersPage() {
             const response = await axios.patch(`${API_URL}/users/toggle-status/${user._id}`)
 
             if (response.data && response.data.success) {
-                // Update user in state
                 const updatedUsers = users.map((u) => (u._id === user._id ? { ...u, isBlocked: !u.isBlocked } : u))
                 setUsers(updatedUsers)
 
-                // Update selected user if it's the one being blocked/unblocked
                 if (selectedUser && selectedUser._id === user._id) {
                     setSelectedUser({ ...selectedUser, isBlocked: !selectedUser.isBlocked })
                 }
@@ -489,63 +477,8 @@ export default function UsersPage() {
                     />
                 </div>
 
-                {/* Filter and Pagination Controls */}
-                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            variant={userFilter === "all" ? "default" : "outline"}
-                            onClick={() => setUserFilter("all")}
-                            size="sm"
-                        >
-                            All ({totalUsers})
-                        </Button>
-                        <Button
-                            variant={userFilter === "user" ? "default" : "outline"}
-                            onClick={() => setUserFilter("user")}
-                            size="sm"
-                        >
-                            Users
-                        </Button>
-                        <Button
-                            variant={userFilter === "customer" ? "default" : "outline"}
-                            onClick={() => setUserFilter("customer")}
-                            size="sm"
-                        >
-                            Customer
-                        </Button>
-                        <Button
-                            variant={userFilter === "COD" ? "default" : "outline"}
-                            onClick={() => setUserFilter("COD")}
-                            size="sm"
-                        >
-                            COD
-                        </Button>
-                        <Button
-                            variant={userFilter === "Failed" ? "default" : "outline"}
-                            onClick={() => setUserFilter("Failed")}
-                            size="sm"
-                        >
-                            Failed
-                        </Button>
-                        <Button
-                            variant={userFilter === "Renewal" ? "default" : "outline"}
-                            onClick={() => setUserFilter("Renewal")}
-                            size="sm"
-                        >
-                            Renewal
-                        </Button>
-                        <Button
-                            variant={userFilter === "Expired" ? "default" : "outline"}
-                            onClick={() => setUserFilter("Expired")}
-                            size="sm"
-                        >
-                            Expired
-                        </Button>
-                    </div>
-                </div>
-
-                {/* Users Stats Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Users Stats Cards - Only showing Total Users and Total Wallet Balance */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Card className="bg-gray-800 border-gray-700 text-gray-100">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-gray-300">Total Users</CardTitle>
@@ -554,8 +487,6 @@ export default function UsersPage() {
                             <div className="text-3xl font-bold">{totalUsers}</div>
                         </CardContent>
                     </Card>
-
-
 
                     <Card className="bg-gray-800 border-gray-700 text-gray-100">
                         <CardHeader className="pb-2">
@@ -632,17 +563,7 @@ export default function UsersPage() {
                                                                 ? "bg-blue-500 hover:bg-blue-600"
                                                                 : user.tag === "customer"
                                                                     ? "bg-green-500 hover:bg-green-600"
-                                                                    : user.tag === "Customers"
-                                                                        ? "bg-emerald-500 hover:bg-emerald-600"
-                                                                        : user.tag === "COD"
-                                                                            ? "bg-amber-500 hover:bg-amber-600"
-                                                                            : user.tag === "Failed"
-                                                                                ? "bg-red-500 hover:bg-red-600"
-                                                                                : user.tag === "Renewal"
-                                                                                    ? "bg-purple-500 hover:bg-purple-600"
-                                                                                    : user.tag === "Expired"
-                                                                                        ? "bg-gray-500 hover:bg-gray-600"
-                                                                                        : "bg-blue-500 hover:bg-blue-600"
+                                                                    : "bg-blue-500 hover:bg-blue-600"
                                                         }
                                                     >
                                                         {user.tag || "User"}
