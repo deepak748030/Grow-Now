@@ -1,13 +1,13 @@
 import Setting from "../models/Setting.js";
 import { SERVER_IMAGE_URL } from "../services/config.js";
-import redis from '../redis/redisClient.js'
+// import redis from '../redis/redisClient.js'
 
 
 // GET settings
 export const getSettings = async (_, res) => {
     try {
         const cacheKey = 'settings';
-        const cachedSettings = await redis.get(cacheKey);
+        // const cachedSettings = await redis.get(cacheKey);
 
         if (cachedSettings) {
             return res.status(200).json({ success: true, data: JSON.parse(cachedSettings) });
@@ -19,7 +19,7 @@ export const getSettings = async (_, res) => {
         }
 
         // Cache the settings in Redis
-        await redis.set(cacheKey, JSON.stringify(settings));
+        // await redis.set(cacheKey, JSON.stringify(settings));
 
         res.status(200).json({ success: true, data: settings });
     } catch (err) {
@@ -97,7 +97,7 @@ export const updateSettings = async (req, res) => {
             { $set: updateData },
             { new: true, upsert: true }
         );
-        await redis.del('settings'); // Invalidate the cache
+        // await redis.del('settings'); // Invalidate the cache
         res.status(200).json({
             success: true,
             message: 'Settings updated successfully',

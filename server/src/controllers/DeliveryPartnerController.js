@@ -4,7 +4,7 @@ import Payout from "../models/payout.js";
 import productOrders from "../models/productOrders.js";
 import SubscriptionOrders from "../models/SubscriptionOrders.js";
 import moment from "moment";
-import redis from "../redis/redisClient.js";
+// import redis from "../redis/redisClient.js";
 import Attendance from "../models/Attendance.js";
 import BoxReview from "../models/BoxReviews.js";
 import { SERVER_IMAGE_URL } from "../services/config.js";
@@ -164,7 +164,7 @@ export const loginDeliveryPartner = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Delivery Partner not found" });
     }
-    await redis.del("deliveryPartnersCache"); // Clear cache for delivery partners
+    // await redis.del("deliveryPartnersCache"); // Clear cache for delivery partners
 
     // You can later add OTP verification, JWT, etc.
     return res.status(200).json({
@@ -190,19 +190,19 @@ export const loginDeliveryPartner = async (req, res) => {
 
 export const getAllDeliveryPartners = async (req, res) => {
   try {
-    const cacheDeliveryPartner = await redis.get("deliveryPartnersCache");
+    // const cacheDeliveryPartner = await redis.get("deliveryPartnersCache");
     if (cacheDeliveryPartner) {
       return res
         .status(200)
         .json({ success: true, data: JSON.parse(cacheDeliveryPartner) });
     }
     const partners = await DeliveryPartener.find();
-    await redis.set(
-      "deliveryPartnersCache",
-      JSON.stringify(partners),
-      "EX",
-      3600
-    ); // Cache for 1 hour
+    // await redis.set(
+    //   "deliveryPartnersCache",
+    //   JSON.stringify(partners),
+    //   "EX",
+    //   3600
+    // ); // Cache for 1 hour
     res.status(200).json({ success: true, data: partners });
   } catch (error) {
     res.status(500).json({
@@ -288,7 +288,7 @@ export const updateDeliveryPartner = async (req, res) => {
         message: "Delivery Partner not found.",
       });
     }
-    await redis.del("deliveryPartnersCache");
+    // await redis.del("deliveryPartnersCache");
 
     res.status(200).json({
       success: true,
@@ -312,7 +312,7 @@ export const deleteDeliveryPartner = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Delivery Partner not found." });
     }
-    await redis.del("deliveryPartnersCache");
+    // await redis.del("deliveryPartnersCache");
     res
       .status(200)
       .json({ success: true, message: "Delivery Partner deleted." });
@@ -340,7 +340,7 @@ export const updateDeliveryPartnerStatus = async (req, res) => {
         message: "Delivery Partner not found.",
       });
     }
-    await redis.del("deliveryPartnersCache");
+    // await redis.del("deliveryPartnersCache");
     res.status(200).json({
       success: true,
       message: "Delivery Partner status updated.",
@@ -371,7 +371,7 @@ export const updateDeliveryPartnerOnboardingStatus = async (req, res) => {
         message: "Delivery Partner not found.",
       });
     }
-    await redis.del("deliveryPartnersCache");
+    // await redis.del("deliveryPartnersCache");
     res.status(200).json({
       success: true,
       message: "Delivery Partner onboarding status updated.",
@@ -428,7 +428,7 @@ export const verifyDeliveryPartnerOtp = async (req, res) => {
         msg: "Invalid type. Must be 'start' or 'end'.",
       });
     }
-    await redis.del("deliveryPartnersCache");
+    // await redis.del("deliveryPartnersCache");
     return res.status(200).json({
       status: isValid,
       msg: isValid ? "OTP matched successfully" : "Invalid OTP",
@@ -454,7 +454,7 @@ export const getDeliveryPartnersByFranchiseId = async (req, res) => {
     const deliveryPartners = await DeliveryPartener.find({
       assignedBranchId: franchiseId,
     });
-    await redis.del("deliveryPartnersCache");
+    // await redis.del("deliveryPartnersCache");
     res.json({ success: true, deliveryPartners });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -502,7 +502,7 @@ export const setDelivered = async (req, res) => {
     }
 
     await order.save();
-    await redis.del("deliveryPartnersCache");
+    // await redis.del("deliveryPartnersCache");
     res.json({ success: true, order });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -650,7 +650,7 @@ export const markOrderDelivered = async (req, res) => {
       }
 
       await order.save();
-      await redis.del("deliveryPartnersCache");
+      // await redis.del("deliveryPartnersCache");
       return res.json({ success: true, order });
     }
   } catch (err) {
@@ -916,7 +916,7 @@ export const getDeliveryPartnerStats = async (req, res) => {
 
       return res.json({ success: true, data: { year, monthlySummary } });
     }
-    await redis.del("deliveryPartnersCache");
+    // await redis.del("deliveryPartnersCache");
     return res
       .status(400)
       .json({ success: false, message: "Invalid type specified" });
@@ -985,7 +985,7 @@ export const getDeliveryPartnerPayoutData = async (req, res) => {
       totalEarningsFromSubscriptionOrders -
       totalDeductions;
 
-    await redis.del("deliveryPartnersCache");
+    // await redis.del("deliveryPartnersCache");
 
     res.json({
       success: true,

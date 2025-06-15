@@ -2,7 +2,7 @@ import DailyTips from '../models/DailyTips.js';
 import fs from 'fs';
 import path from 'path';
 import { SERVER_IMAGE_URL } from '../services/config.js';
-import redis from '../redis/redisClient.js'; // Optional: Redis client for caching
+// import redis from '../redis/redisClient.js'; // Optional: Redis client for caching
 
 const deleteImage = (imageUrl) => {
     const filePath = path.join(process.cwd(), imageUrl);
@@ -21,7 +21,7 @@ export const createDailyTip = async (req, res) => {
 
         const newTip = new DailyTips({ title, imageUrl, subscription });
         await newTip.save();
-        await redis.del("dailyTipsCache");
+        // await redis.del("dailyTipsCache");
         res.status(201).json({ success: true, data: newTip });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -32,13 +32,13 @@ export const createDailyTip = async (req, res) => {
 export const getAllDailyTips = async (req, res) => {
     try {
         const cacheKey = 'dailyTipsCache';
-        const cachedCategories = await redis.get(cacheKey);
+        // const cachedCategories = await redis.get(cacheKey);
         if (cachedCategories) {
             return res.status(200).json({ success: true, data: JSON.parse(cachedCategories) });
         }
 
         const tips = await DailyTips.find().select('-createdAt -updatedAt -__v').sort({ createdAt: -1 });
-        await redis.set(cacheKey, JSON.stringify(tips), 'EX', 3600); // Cache for 1 hour
+        // await redis.set(cacheKey, JSON.stringify(tips), 'EX', 3600); // Cache for 1 hour
 
         res.status(200).json({ success: true, data: tips });
     } catch (error) {
@@ -74,7 +74,7 @@ export const updateDailyTip = async (req, res) => {
 
         const updatedTip = await DailyTips.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
 
-        await redis.del("dailyTipsCache");
+        // await redis.del("dailyTipsCache");
 
         res.status(200).json({ success: true, data: updatedTip });
     } catch (error) {
@@ -91,7 +91,7 @@ export const deleteDailyTip = async (req, res) => {
         if (tip.imageUrl) deleteImage(tip.imageUrl);
 
         await DailyTips.findByIdAndDelete(req.params.id);
-        await redis.del("dailyTipsCache");
+        // await redis.del("dailyTipsCache");
         res.status(200).json({ success: true, message: 'Daily Tip deleted successfully' });
     } catch (error) {
         res.status(500).json({ error: error.message });

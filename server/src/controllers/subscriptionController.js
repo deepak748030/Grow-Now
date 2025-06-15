@@ -1,7 +1,7 @@
 // Subscription Controllers
 import Subscription from '../models/Subscription.js';
 import { SERVER_IMAGE_URL } from '../services/config.js';
-import redis from '../redis/redisClient.js'
+// import redis from '../redis/redisClient.js'
 
 // Create Subscription
 export const createSubscription = async (req, res) => {
@@ -41,7 +41,7 @@ export const createSubscription = async (req, res) => {
         });
 
         const savedSubscription = await newSubscription.save();
-        await redis.del("subscriptions"); // Clear cache after creating a new subscription
+        // await redis.del("subscriptions"); // Clear cache after creating a new subscription
         res.status(201).json({
             success: true,
             data: [savedSubscription] // Returning as array to match frontend expectation
@@ -57,7 +57,7 @@ export const createSubscription = async (req, res) => {
 // Get all Subscriptions
 export const getAllSubscriptions = async (req, res) => {
     try {
-        const subscriptionCache = await redis.get("subscriptions");
+        // const subscriptionCache = await redis.get("subscriptions");
         if (subscriptionCache) {
             return res.status(200).json({
                 success: true,
@@ -65,7 +65,7 @@ export const getAllSubscriptions = async (req, res) => {
             });
         }
         const subscriptions = await Subscription.find();
-        await redis.set("subscriptions", JSON.stringify(subscriptions), "EX", 3600); // Cache for 1 hour
+        // await redis.set("subscriptions", JSON.stringify(subscriptions), "EX", 3600); // Cache for 1 hour
         res.status(200).json({
             success: true,
             data: subscriptions
@@ -144,7 +144,7 @@ export const updateSubscription = async (req, res) => {
                 error: 'Subscription not found'
             });
         }
-        await redis.del("subscriptions"); // Clear cache after updating a subscription
+        // await redis.del("subscriptions"); // Clear cache after updating a subscription
         res.status(200).json({
             success: true,
             data: [updatedSubscription] // Returning as array to match frontend expectation
@@ -167,7 +167,7 @@ export const deleteSubscription = async (req, res) => {
                 error: 'Subscription not found'
             });
         }
-        await redis.del("subscriptions"); // Clear cache after creating a new subscription
+        // await redis.del("subscriptions"); // Clear cache after creating a new subscription
         res.status(200).json({
             success: true,
             message: 'Subscription deleted successfully'

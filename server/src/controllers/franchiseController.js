@@ -3,7 +3,7 @@ import { getDistance } from "geolib";
 import OtpSession from "../models/OtpSession.js";
 import SubscriptionOrders from "../models/SubscriptionOrders.js";
 import productOrders from "../models/productOrders.js";
-import redis from '../redis/redisClient.js'
+// import redis from '../redis/redisClient.js'
 
 // POST /franchise
 export const createFranchise = async (req, res) => {
@@ -47,7 +47,7 @@ export const createFranchise = async (req, res) => {
     });
 
     await newFranchise.save();
-    await redis.del('franchises');
+    // await redis.del('franchises');
     res
       .status(201)
       .json({ message: "Franchise created successfully", data: newFranchise });
@@ -60,12 +60,12 @@ export const createFranchise = async (req, res) => {
 // GET /franchise
 export const getFranchises = async (_, res) => {
   try {
-    const cacheFranchises = await redis.get("franchises");
+    // const cacheFranchises = await redis.get("franchises");
     if (cacheFranchises) {
       return res.status(200).json({ data: JSON.parse(cacheFranchises) });
     }
     const franchises = await Franchise.find().populate("assignedManager");
-    await redis.set('franchises', JSON.stringify(franchises), 'EX', 3600)
+    // await redis.set('franchises', JSON.stringify(franchises), 'EX', 3600)
     res.status(200).json({ data: franchises });
   } catch (err) {
     console.error(err);
@@ -83,7 +83,7 @@ export const getFranchiseById = async (req, res) => {
     if (!franchise) {
       return res.status(404).json({ message: "Franchise not found" });
     }
-    await redis.del('franchises')
+    // await redis.del('franchises')
     res.status(200).json({ data: franchise });
   } catch (err) {
     console.error(err);
@@ -144,7 +144,7 @@ export const updateFranchise = async (req, res) => {
       return res.status(404).json({ message: "Franchise not found" });
     }
 
-    await redis.del('franchises');
+    // await redis.del('franchises');
     res.status(200).json({
       message: "Franchise updated successfully",
       data: updatedFranchise,
@@ -165,7 +165,7 @@ export const deleteFranchise = async (req, res) => {
     if (!deletedFranchise) {
       return res.status(404).json({ message: "Franchise not found" });
     }
-    await redis.del('franchises')
+    // await redis.del('franchises')
     res.status(200).json({ message: "Franchise deleted successfully" });
   } catch (err) {
     console.error(err);

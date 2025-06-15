@@ -1,7 +1,7 @@
 import CategoryByChoices from "../models/CategoryByChoices.js";
 import fs from "fs";
 import { SERVER_IMAGE_URL } from "../services/config.js";
-import redis from '../redis/redisClient.js'
+// import redis from '../redis/redisClient.js'
 
 
 // Create a new category
@@ -11,7 +11,7 @@ export const createCategory = async (req, res) => {
         const image = req.file ? req.file.path : "";
 
         const categoryData = await CategoryByChoices.create({ title, type, productId, category, image, types });
-        await redis.del("categories"); // Clear the cache after creating a new category
+        // await redis.del("categories"); // Clear the cache after creating a new category
         res.status(201).json({ success: true, data: categoryData });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
@@ -21,12 +21,12 @@ export const createCategory = async (req, res) => {
 // Get all categories
 export const getAllCategories = async (req, res) => {
     try {
-        const cacheCategories = await redis.get("categories");
+        // const cacheCategories = await redis.get("categories");
         if (cacheCategories) {
             return res.status(200).json({ success: true, data: JSON.parse(cacheCategories) });
         }
         const categories = await CategoryByChoices.find();
-        await redis.set("categories", JSON.stringify(categories), "EX", 3600);
+        // await redis.set("categories", JSON.stringify(categories), "EX", 3600);
         res.status(200).json({ success: true, data: categories });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -72,7 +72,7 @@ export const updateCategory = async (req, res) => {
             new: true,
             runValidators: true
         });
-        await redis.del("categories"); // Clear the cache after creating a new category
+        // await redis.del("categories"); // Clear the cache after creating a new category
         res.status(200).json({ success: true, data: updatedCategory });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
@@ -93,7 +93,7 @@ export const deleteCategory = async (req, res) => {
         }
 
         await CategoryByChoices.findByIdAndDelete(req.params.id);
-        await redis.del("categories"); // Clear the cache after creating a new category
+        // await redis.del("categories"); // Clear the cache after creating a new category
         res.status(200).json({ success: true, message: "Category deleted successfully" });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

@@ -1,7 +1,7 @@
 import Category from "../models/Category.js";
 import fs from "fs";
 import path from "path";
-import redis from "../redis/redisClient.js";
+// import redis from "../redis/redisClient.js";
 // Optional: A simple logger helper (replace with your enterprise logger)
 const logger = {
     info: (msg, meta) => console.info(msg, meta || ""),
@@ -70,7 +70,7 @@ export const createCategory = async (req, res) => {
 export const getCategories = async (req, res) => {
     try {
         const cacheKey = "categories";
-        const cachedCategories = await redis.get(cacheKey);
+        // const cachedCategories = await redis.get(cacheKey);
 
         if (cachedCategories) {
             logger.info("Cache hit for categories");
@@ -81,7 +81,7 @@ export const getCategories = async (req, res) => {
         const categories = await Category.find({}, "_id title image").lean();
 
         // Cache the result for future requests
-        await redis.set(cacheKey, JSON.stringify(categories), "EX", 3600); // Cache for 1 hour
+        // await redis.set(cacheKey, JSON.stringify(categories), "EX", 3600); // Cache for 1 hour
 
         res.json({ success: true, data: categories });
     } catch (error) {
