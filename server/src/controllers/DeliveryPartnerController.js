@@ -191,11 +191,11 @@ export const loginDeliveryPartner = async (req, res) => {
 export const getAllDeliveryPartners = async (req, res) => {
   try {
     // const cacheDeliveryPartner = await redis.get("deliveryPartnersCache");
-    if (cacheDeliveryPartner) {
-      return res
-        .status(200)
-        .json({ success: true, data: JSON.parse(cacheDeliveryPartner) });
-    }
+    // if (cacheDeliveryPartner) {
+    //   return res
+    //     .status(200)
+    //     .json({ success: true, data: JSON.parse(cacheDeliveryPartner) });
+    // }
     const partners = await DeliveryPartener.find();
     // await redis.set(
     //   "deliveryPartnersCache",
