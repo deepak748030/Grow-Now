@@ -61,9 +61,9 @@ export const createFranchise = async (req, res) => {
 export const getFranchises = async (_, res) => {
   try {
     // const cacheFranchises = await redis.get("franchises");
-    if (cacheFranchises) {
-      return res.status(200).json({ data: JSON.parse(cacheFranchises) });
-    }
+    // if (cacheFranchises) {
+    //   return res.status(200).json({ data: JSON.parse(cacheFranchises) });
+    // }
     const franchises = await Franchise.find().populate("assignedManager");
     // await redis.set('franchises', JSON.stringify(franchises), 'EX', 3600)
     res.status(200).json({ data: franchises });
