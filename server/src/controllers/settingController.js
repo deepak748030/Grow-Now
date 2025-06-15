@@ -6,12 +6,12 @@ import { SERVER_IMAGE_URL } from "../services/config.js";
 // GET settings
 export const getSettings = async (_, res) => {
     try {
-        const cacheKey = 'settings';
+        // const cacheKey = 'settings';
         // const cachedSettings = await redis.get(cacheKey);
 
-        if (cachedSettings) {
-            return res.status(200).json({ success: true, data: JSON.parse(cachedSettings) });
-        }
+        // if (cachedSettings) {
+        //     return res.status(200).json({ success: true, data: JSON.parse(cachedSettings) });
+        // }
 
         let settings = await Setting.findOne();
         if (!settings) {
