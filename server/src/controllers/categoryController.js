@@ -1,19 +1,15 @@
 import Category from "../models/Category.js";
 import fs from "fs";
 import path from "path";
-// import redis from "../redis/redisClient.js";
-// Optional: A simple logger helper (replace with your enterprise logger)
+import { SERVER_IMAGE_URL } from "../services/config.js";
+
+// Logger
 const logger = {
     info: (msg, meta) => console.info(msg, meta || ""),
     error: (msg, meta) => console.error(msg, meta || ""),
 };
 
-/**
- * Helper function to delete a file if it exists.
- * Uses promises for asynchronous file deletion.
- *
- * @param {string} filePath - The file path to delete.
- */
+// Delete file if exists
 const deleteFile = async (filePath) => {
     if (!filePath) return;
     try {
@@ -28,10 +24,7 @@ const deleteFile = async (filePath) => {
     }
 };
 
-/**
- * ✅ Create a new category.
- * Validates required fields, checks for duplicates, and creates a new Category document.
- */
+// ✅ Create Category
 export const createCategory = async (req, res) => {
     try {
         const { title } = req.body;
@@ -39,16 +32,13 @@ export const createCategory = async (req, res) => {
             return res.status(400).json({ success: false, error: "Title is required." });
         }
 
-        // Check if category already exists
         const existingCategory = await Category.exists({ title });
         if (existingCategory) {
             return res.status(400).json({ success: false, error: "Category already exists." });
         }
 
-        // Process image if provided
-        const image = req.file ? req.file.path.replace(/\\/g, "/") : "";
+        const image = req.file ? `${SERVER_IMAGE_URL}/${req.file.path.replace(/\\/g, "/")}` : "";
 
-        // Create category
         const category = await Category.create({ title, image });
         logger.info("Category created", { categoryId: category._id, title });
 
@@ -63,17 +53,11 @@ export const createCategory = async (req, res) => {
     }
 };
 
-/**
- * ✅ Get all categories.
- * Retrieves a list of all categories with selected fields.
- */
+// ✅ Get All Categories
 export const getCategories = async (req, res) => {
     try {
-
-
         logger.info("Cache miss for categories, fetching from database");
         const categories = await Category.find({}, "_id title image").lean();
-
         res.json({ success: true, data: categories });
     } catch (error) {
         logger.error("Get Categories Error:", error);
@@ -81,10 +65,7 @@ export const getCategories = async (req, res) => {
     }
 };
 
-/**
- * ✅ Get a single category by ID.
- * Retrieves one category using its ID.
- */
+// ✅ Get Single Category
 export const getCategory = async (req, res) => {
     try {
         const { id } = req.params;
@@ -101,38 +82,30 @@ export const getCategory = async (req, res) => {
     }
 };
 
-/**
- * ✅ Update category with optional image upload.
- * Updates the category title and/or image. If a new image is provided,
- * the old image is deleted from disk to conserve space.
- */
+// ✅ Update Category
 export const updateCategory = async (req, res) => {
     try {
         const { id } = req.params;
         const { title } = req.body;
-        const newImage = req.file ? req.file.path.replace(/\\/g, "/") : undefined;
+        const newImage = req.file ? `${SERVER_IMAGE_URL}/${req.file.path.replace(/\\/g, "/")}` : undefined;
 
-        // Retrieve the current document for modification
         const categoryDoc = await Category.findById(id);
         if (!categoryDoc) {
             return res.status(404).json({ success: false, error: "Category not found." });
         }
 
-        // Update title if provided and unique
         if (title && title !== categoryDoc.title) {
-            const duplicate = await Category.findOne({ title, _id: { $ne: id } })
-                .select("_id")
-                .lean();
+            const duplicate = await Category.findOne({ title, _id: { $ne: id } }).select("_id").lean();
             if (duplicate) {
                 return res.status(400).json({ success: false, error: "Title already exists." });
             }
             categoryDoc.title = title;
         }
 
-        // Update image if provided: delete old file and set new image path
         if (newImage) {
             if (categoryDoc.image) {
-                await deleteFile(categoryDoc.image);
+                const localImagePath = categoryDoc.image.replace(SERVER_IMAGE_URL + "/", "");
+                await deleteFile(localImagePath);
             }
             categoryDoc.image = newImage;
         }
@@ -150,22 +123,18 @@ export const updateCategory = async (req, res) => {
     }
 };
 
-/**
- * ✅ Delete category with image cleanup.
- * Deletes the category document and removes the associated image file from disk.
- */
+// ✅ Delete Category
 export const deleteCategory = async (req, res) => {
     try {
         const { id } = req.params;
-        // Find the category to get the image path before deletion.
         const category = await Category.findById(id);
         if (!category) {
             return res.status(404).json({ success: false, error: "Category not found." });
         }
 
-        // Delete associated image if exists.
         if (category.image) {
-            await deleteFile(category.image);
+            const localImagePath = category.image.replace(SERVER_IMAGE_URL + "/", "");
+            await deleteFile(localImagePath);
         }
 
         await Category.findByIdAndDelete(id);
@@ -177,40 +146,30 @@ export const deleteCategory = async (req, res) => {
     }
 };
 
-/**
- * ✅ PATCH: Partial update with optional image upload.
- * Allows partial updates. If a new image is provided, deletes the old image.
- */
+// ✅ Patch Category
 export const updateCategoryPatch = async (req, res) => {
     try {
         const { id } = req.params;
         const updateData = req.body;
-        const newImage = req.file ? req.file.path.replace(/\\/g, "/") : undefined;
+        const newImage = req.file ? `${SERVER_IMAGE_URL}/${req.file.path.replace(/\\/g, "/")}` : undefined;
 
-        // Retrieve the current category document for modification.
         const categoryDoc = await Category.findById(id);
         if (!categoryDoc) {
             return res.status(404).json({ success: false, error: "Category not found." });
         }
 
-        // If a new title is provided, check for uniqueness.
         if (updateData.title && updateData.title !== categoryDoc.title) {
-            const duplicate = await Category.findOne({
-                title: updateData.title,
-                _id: { $ne: id },
-            })
-                .select("_id")
-                .lean();
+            const duplicate = await Category.findOne({ title: updateData.title, _id: { $ne: id } }).select("_id").lean();
             if (duplicate) {
                 return res.status(400).json({ success: false, error: "Title already exists." });
             }
             categoryDoc.title = updateData.title;
         }
 
-        // If a new image is provided, delete the old image file and update.
         if (newImage) {
             if (categoryDoc.image) {
-                await deleteFile(categoryDoc.image);
+                const localImagePath = categoryDoc.image.replace(SERVER_IMAGE_URL + "/", "");
+                await deleteFile(localImagePath);
             }
             categoryDoc.image = newImage;
         }
