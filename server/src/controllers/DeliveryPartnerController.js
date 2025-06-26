@@ -2,6 +2,7 @@ import DeliveryPartener from "../models/DeliveryPartener.js";
 import OtpSession from "../models/OtpSession.js";
 import Payout from "../models/payout.js";
 import productOrders from "../models/productOrders.js";
+import User from '../models/User.js'
 import SubscriptionOrders from "../models/SubscriptionOrders.js";
 import moment from "moment";
 // import redis from "../redis/redisClient.js";
@@ -494,6 +495,22 @@ export const setDelivered = async (req, res) => {
       isBoxPicked,
       isBoxCleaned,
     };
+
+    // ✅ Fix: Proper wallet update
+    const user = await User.findById(deliveryPartnerId);
+    if (user) {
+      user.wallet = (user.wallet || 0) + earnedByDelivery;
+      await user.save();
+    }
+
+
+    // ✅ Update amountEarnedByDeliveryPartner in ProductOrders if orderType is 'product'
+
+    const productOrdersFind = await productOrders.findById(orderId);
+    if (productOrdersFind) {
+      productOrdersFind.amountEarnedByDeliveryPartner = earnedByDelivery;
+      await productOrdersFind.save();
+    }
 
     // Add next delivery if failed
     if (status === "failed" && orderType === "subscription") {
