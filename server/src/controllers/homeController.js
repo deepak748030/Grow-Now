@@ -8,7 +8,7 @@ import CategoryByChoices from "../models/CategoryByChoices.js";
 // Controller for Home Data
 export const getHomeData = async (req, res) => {
     try {
-        const rawProducts = await Product.find({});
+        const rawProducts = await Product.find({}).populate('category');
         const rawSubscriptions = await Subscription.find({});
         const goals = await Goal.find({});
         const banners = await Banner.find({});
