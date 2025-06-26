@@ -18,12 +18,19 @@ interface ProductType {
   _id?: string
 }
 
-// Update the Product interface to match the provided data format:
+// Add this interface after the existing interfaces
+interface Category {
+  _id: string
+  title: string
+  image: string
+}
+
+// Update the Product interface to include populated category
 interface Product {
   _id: string
   title: string
   description: string
-  category: string
+  category: string | Category // Can be either ID string or populated category object
   stock: number
   weightOrCount: string
   tag: string[]
@@ -42,6 +49,9 @@ interface ApiResponse<T> {
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000/api",
 })
+
+// Add SERVER_URL constant
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3000"
 
 // API Functions
 const getProducts = async () => {
@@ -76,6 +86,11 @@ const searchProducts = async (query: string, category?: string) => {
   const response = await api.get<ApiResponse<Product>>("/products/search", {
     params: { q: query, category },
   })
+  return response.data.data
+}
+
+const getCategories = async () => {
+  const response = await api.get<ApiResponse<Category>>("/categories")
   return response.data.data
 }
 
@@ -118,6 +133,99 @@ const EmptyState = ({ message }: { message: string }) => (
   </div>
 )
 
+// Custom Category Dropdown Component
+const CategoryDropdown = ({
+  categories,
+  value,
+  onChange,
+  isLoading,
+  error,
+}: {
+  categories: Category[]
+  value: string
+  onChange: (categoryId: string) => void
+  isLoading?: boolean
+  error?: string
+}) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const selectedCategory = categories.find((cat) => cat._id === value)
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full h-12 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center justify-between"
+        disabled={isLoading}
+      >
+        <div className="flex items-center space-x-3">
+          {selectedCategory ? (
+            <>
+              <img
+                src={selectedCategory.image ? `${SERVER_URL}/${selectedCategory.image}` : "/placeholder.svg"}
+                alt={selectedCategory.title}
+                className="w-6 h-6 rounded object-cover"
+              />
+              <span>{selectedCategory.title}</span>
+            </>
+          ) : (
+            <span className="text-gray-400">Select a category</span>
+          )}
+        </div>
+        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          {isLoading ? (
+            <div className="p-4 text-center text-gray-400">Loading categories...</div>
+          ) : error ? (
+            <div className="p-4 text-center text-red-400">Error loading categories</div>
+          ) : categories.length === 0 ? (
+            <div className="p-4 text-center text-gray-400">No categories available</div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange("")
+                  setIsOpen(false)
+                }}
+                className="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center space-x-3"
+              >
+                <div className="w-6 h-6 rounded bg-gray-600 flex items-center justify-center">
+                  <Package className="w-4 h-4 text-gray-400" />
+                </div>
+                <span className="text-gray-400">No category</span>
+              </button>
+              {categories.map((category) => (
+                <button
+                  key={category._id}
+                  type="button"
+                  onClick={() => {
+                    onChange(category._id)
+                    setIsOpen(false)
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center space-x-3"
+                >
+                  <img
+                    src={category.image ? `${SERVER_URL}/${category.image}` : "/placeholder.svg"}
+                    alt={category.title}
+                    className="w-6 h-6 rounded object-cover"
+                  />
+                  <span>{category.title}</span>
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ProductPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isInitialLoading, setIsInitialLoading] = useState(true)
@@ -127,10 +235,11 @@ export default function ProductPage() {
   const [mainImageIndex, setMainImageIndex] = useState<number>(0)
   const [products, setProducts] = useState<Product[]>([])
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("")
+  const [categories, setCategories] = useState<Category[]>([])
+  const [selectedCategoryId, setSelectedCategoryId] = useState("")
+  const [isCategoriesLoading, setIsCategoriesLoading] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
-  const [categories, setCategories] = useState<string[]>([])
   const [isSearching, setIsSearching] = useState(false)
 
   // Reference to file input for resetting
@@ -156,16 +265,15 @@ export default function ProductPage() {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const productsData = await getProducts()
+        setIsCategoriesLoading(true)
+        const [productsData, categoriesData] = await Promise.all([getProducts(), getCategories()])
         setProducts(productsData)
-
-        // Extract unique categories
-        const uniqueCategories = Array.from(new Set(productsData.map((product) => product.category)))
-        setCategories(uniqueCategories)
+        setCategories(categoriesData)
       } catch (error) {
         console.error("Failed to fetch initial data:", error)
       } finally {
         setIsInitialLoading(false)
+        setIsCategoriesLoading(false)
       }
     }
     fetchInitialData()
@@ -174,7 +282,7 @@ export default function ProductPage() {
   // Handle search with debouncing
   useEffect(() => {
     const handleSearch = async () => {
-      if (!searchQuery && !selectedCategory) {
+      if (!searchQuery && !selectedCategoryId) {
         const data = await getProducts()
         setProducts(data)
         return
@@ -182,7 +290,7 @@ export default function ProductPage() {
 
       setIsSearching(true)
       try {
-        const data = await searchProducts(searchQuery, selectedCategory || undefined)
+        const data = await searchProducts(searchQuery, selectedCategoryId || undefined)
         setProducts(data)
       } catch (error) {
         console.error("Failed to search products:", error)
@@ -193,7 +301,7 @@ export default function ProductPage() {
 
     const debounceTimeout = setTimeout(handleSearch, 300)
     return () => clearTimeout(debounceTimeout)
-  }, [searchQuery, selectedCategory])
+  }, [searchQuery, selectedCategoryId])
 
   // Reset form completely
   const resetFormCompletely = () => {
@@ -252,8 +360,8 @@ export default function ProductPage() {
       setProducts(productsData)
 
       // Extract unique categories
-      const uniqueCategories = Array.from(new Set(productsData.map((product) => product.category)))
-      setCategories(uniqueCategories)
+      const categoriesData = await getCategories()
+      setCategories(categoriesData)
 
       // Reset form and state
       resetFormCompletely()
@@ -298,7 +406,7 @@ export default function ProductPage() {
       // Set form values
       setValue("title", fullProduct.title)
       setValue("description", fullProduct.description)
-      setValue("category", fullProduct.category)
+      setValue("category", typeof fullProduct.category === "object" ? fullProduct.category._id : fullProduct.category)
       setValue("stock", fullProduct.stock)
       setValue("weightOrCount", fullProduct.weightOrCount)
       setValue("tag", fullProduct.tag ? fullProduct.tag[0] : "")
@@ -407,8 +515,6 @@ export default function ProductPage() {
     resetFormCompletely()
   }
 
-
-
   // Stock status indicator
   const getStockStatus = (stock: number) => {
     if (stock <= 0) return { label: "Out of Stock", color: "bg-red-100 text-red-800" }
@@ -484,18 +590,12 @@ export default function ProductPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <select
-            className="h-12 px-6 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-          >
-            <option value="">All Categories</option>
-            {categories.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
+          <CategoryDropdown
+            categories={categories}
+            value={selectedCategoryId}
+            onChange={(categoryId) => setSelectedCategoryId(categoryId)}
+            isLoading={isCategoriesLoading}
+          />
         </div>
 
         {/* Products List/Grid */}
@@ -556,7 +656,11 @@ export default function ProductPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-300">{product.category}</div>
+                            <div className="text-sm text-gray-300">
+                              {typeof product.category === "object"
+                                ? product.category.title
+                                : product.category || "No category"}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {product.tag && (
@@ -622,7 +726,11 @@ export default function ProductPage() {
                           )}
                           <div>
                             <h3 className="text-sm font-medium text-gray-100">{product.title}</h3>
-                            <p className="text-xs text-gray-400">{product.category}</p>
+                            <p className="text-xs text-gray-400">
+                              {typeof product.category === "object"
+                                ? product.category.title
+                                : product.category || "No category"}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-3">
@@ -702,16 +810,12 @@ export default function ProductPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
-                  <input
-                    {...register("category")}
-                    className="w-full h-12 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    list="categories"
+                  <CategoryDropdown
+                    categories={categories}
+                    value={watch("category")}
+                    onChange={(categoryId) => setValue("category", categoryId)}
+                    isLoading={isCategoriesLoading}
                   />
-                  <datalist id="categories">
-                    {categories.map((category) => (
-                      <option key={category} value={category} />
-                    ))}
-                  </datalist>
                   {errors.category && <p className="mt-2 text-sm text-red-400">{errors.category.message}</p>}
                 </div>
               </div>

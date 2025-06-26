@@ -15,7 +15,7 @@ import {
   // CreditCard,
   // Lightbulb,
   // Trophy,
-  // ListTree,
+  ListTree,
   // ClipboardList,
   // CheckCircle,
   // MapPinOff,
@@ -93,11 +93,11 @@ const menuItems = [
   //   icon: Star, // Lucide icon suitable for reviews or ratings
   //   label: 'Reviews'
   // },
-  // {
-  //   path: '/category-choice',
-  //   icon: ListTree,
-  //   label: 'category-choice'
-  // },
+  {
+    path: '/categories',
+    icon: ListTree,
+    label: 'categories'
+  },
   // {
   //   path: '/goals',
   //   icon: Trophy,
