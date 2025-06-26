@@ -50,9 +50,6 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000/api",
 })
 
-// Add SERVER_URL constant
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3000"
-
 // API Functions
 const getProducts = async () => {
   const response = await api.get<ApiResponse<Product>>("/products")
@@ -162,7 +159,7 @@ const CategoryDropdown = ({
           {selectedCategory ? (
             <>
               <img
-                src={selectedCategory.image ? `${SERVER_URL}/${selectedCategory.image}` : "/placeholder.svg"}
+                src={selectedCategory.image || "/placeholder.svg"}
                 alt={selectedCategory.title}
                 className="w-6 h-6 rounded object-cover"
               />
@@ -211,7 +208,7 @@ const CategoryDropdown = ({
                   className="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center space-x-3"
                 >
                   <img
-                    src={category.image ? `${SERVER_URL}/${category.image}` : "/placeholder.svg"}
+                    src={category.image || "/placeholder.svg"}
                     alt={category.title}
                     className="w-6 h-6 rounded object-cover"
                   />

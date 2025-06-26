@@ -266,7 +266,7 @@ export default function CategoriesPage() {
                 <img
                   src={
                     category.image
-                      ? `${import.meta.env.VITE_API_URL}/${category.image}`
+                      ? `${category.image}`
                       : "https://images.unsplash.com/photo-1557683316-973673baf926?w=800&auto=format&fit=crop&q=60"
                   }
                   alt={category.title}
