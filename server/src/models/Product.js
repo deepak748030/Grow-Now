@@ -40,9 +40,8 @@ const ProductSchema = new mongoose.Schema(
             required: [true, "Description is required"],
         },
         category: {
-            type: String,
-            required: [true, "Category is required"],
-            index: true,
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Category",
         },
         stock: {
             type: Number,

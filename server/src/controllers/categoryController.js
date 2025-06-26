@@ -69,19 +69,10 @@ export const createCategory = async (req, res) => {
  */
 export const getCategories = async (req, res) => {
     try {
-        const cacheKey = "categories";
-        // const cachedCategories = await redis.get(cacheKey);
 
-        if (cachedCategories) {
-            logger.info("Cache hit for categories");
-            return res.json({ success: true, data: JSON.parse(cachedCategories) });
-        }
 
         logger.info("Cache miss for categories, fetching from database");
         const categories = await Category.find({}, "_id title image").lean();
-
-        // Cache the result for future requests
-        // await redis.set(cacheKey, JSON.stringify(categories), "EX", 3600); // Cache for 1 hour
 
         res.json({ success: true, data: categories });
     } catch (error) {

@@ -54,7 +54,9 @@ export const getAllProducts = async (req, res) => {
         //     console.log("first");
         //     return res.status(200).json({ success: true, data: JSON.parse(cacheProducts) });
         // }
-        const products = await Product.find().sort({ createdAt: -1 }).select('-createdAt -updatedAt');
+        const products = await Product.find().sort({ createdAt: -1 })
+            .populate('category')
+            .select('-createdAt -updatedAt');
         // await redis.set('products', JSON.stringify(products), 'EX', 3600); // Cache for 1 hour
         res.status(200).json({ success: true, data: products });
     } catch (error) {
