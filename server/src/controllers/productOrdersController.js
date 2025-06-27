@@ -24,7 +24,6 @@ export const createProductOrder = async (req, res) => {
       deliveryFees = 0,
       platformFees = 0,
       assignedFranchiseId,
-      deliveryPartnerId
     } = req.body;
 
     // Validate required fields
@@ -43,8 +42,7 @@ export const createProductOrder = async (req, res) => {
       !buildingName ||
       !floor ||
       !landmark ||
-      !assignedFranchiseId ||
-      !deliveryPartnerId
+      !assignedFranchiseId
     ) {
       return res.status(400).json({
         success: false,
@@ -92,7 +90,6 @@ export const createProductOrder = async (req, res) => {
       gstAmount,
       deliveryFees,
       platformFees,
-      deliveryPartnerId,
       assignedFranchiseId,
       location: {
         address,
