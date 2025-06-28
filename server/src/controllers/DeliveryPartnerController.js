@@ -543,7 +543,7 @@ export const markOrderDelivered = async (req, res) => {
       isBoxPicked,
       isBoxCleaned,
       status,
-      isSubscription,
+      isSubscription = false,
     } = req.body;
 
     if (!isBoxPicked || !isBoxCleaned) {
@@ -632,6 +632,7 @@ export const markOrderDelivered = async (req, res) => {
       return res.json({ success: true, order });
     } else {
       const order = await productOrders.findById(orderId);
+      console.log(order)
       if (!order)
         return res
           .status(404)
@@ -643,7 +644,7 @@ export const markOrderDelivered = async (req, res) => {
         deliveryTime,
         isBoxPicked,
         isBoxCleaned,
-        amountEarnedByDelivery: earnedByDelivery,
+        amountEarnedByDeliveryPartner: earnedByDelivery, // ✅ correct field name
       });
 
       if (status === "Delivered") {
