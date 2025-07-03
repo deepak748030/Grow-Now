@@ -27,7 +27,8 @@ import PayoutPage from './pages/payout/PayoutPage';
 import DeliveryPartnerVerificationPage from './pages/deliver-partner/DeliveryPartnerVerification';
 import ReviewsManagementPage from './pages/reviews/ReviewsManagementPage';
 import BoxManagementPage from './pages/box/BoxInfoPage';
-
+import TopCategoriesPage from './pages/categories/TopCategoriesPage';
+import SubCategoriesPage from './pages/categories/SubCAtegoriesPage';
 // Theme wrapper component
 function ThemeWrapper({ children }: { children: React.ReactNode }) {
   const isDarkMode = useSelector((state: RootState) => state.theme.isDarkMode);
@@ -57,10 +58,12 @@ function App() {
             <Route path="/" element={<DashboardLayout />}>
               <Route index element={<DashboardPage />} />  {/* Default page for "/" */}
               <Route path="products" element={<ProductsPage />} />
+              <Route path="top-categories" element={<TopCategoriesPage />} />
               <Route path="orders" element={<OrdersPage />} />
               <Route path="categories" element={<CategoriesPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="subscriptions" element={<SubscriptionPage />} />
+              <Route path="sub-categories" element={<SubCategoriesPage />} />
               <Route path="daily-tips" element={<DailyTipsPage />} />
               <Route path="goals" element={<GoalPage />} />
               <Route path="category-choice" element={<CategoryChoice />} />

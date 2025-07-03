@@ -22,6 +22,8 @@ import {
   Briefcase,
   // HandCoins,
   ShieldCheck,
+  Layers,
+  FolderTree,
   // Star,
   // Box
 } from 'lucide-react';
@@ -98,6 +100,17 @@ const menuItems = [
     icon: ListTree,
     label: 'categories'
   },
+  {
+    path: '/top-categories',
+    icon: Layers, // ✅ Example icon for Top Categories
+    label: 'Top Categories'
+  },
+  {
+    path: '/sub-categories',
+    icon: FolderTree,
+    label: 'Sub Categories'
+  }
+  ,
   // {
   //   path: '/goals',
   //   icon: Trophy,
