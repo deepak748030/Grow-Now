@@ -632,7 +632,6 @@ export const markOrderDelivered = async (req, res) => {
       return res.json({ success: true, order });
     } else {
       const order = await productOrders.findById(orderId);
-      console.log(order)
       if (!order)
         return res
           .status(404)

@@ -40,6 +40,10 @@ import workersRoute from "../routes/workerRoutes.js"; // Worker Route
 import "../redis/redisClient.js"
 import AttendanceRouter from "../routes/AttandanceRouter.js"; // Attendance Routes
 import BoxRoutes from '../routes/boxRoutes.js'
+import topCategoryRoutes from "../routes/topCategoryRoutes.js";
+import subCategoryRoutes from "../routes/subCategoryRoutes.js";
+
+
 
 import upload from "../middleware/multer.js";
 
@@ -98,6 +102,8 @@ app.use("/unavailable-locations", unavailableLocationRoutes); // Unavailable Loc
 app.use("/workers", workersRoute); // Worker Route
 app.use("/attendance", AttendanceRouter); // Attendance Routes
 app.use("/box", BoxRoutes); // Box Routes
+app.use("/top-categories", topCategoryRoutes);
+app.use("/sub-categories", subCategoryRoutes);
 
 // ✅ Default Route
 app.get("/", (req, res) => {

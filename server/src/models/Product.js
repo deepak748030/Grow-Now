@@ -43,6 +43,16 @@ const ProductSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: "Category",
         },
+        topCategory: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "TopCategory",
+            required: [true, "Top Category reference is required"],
+        },
+        subCategory: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "SubCategory",
+            required: [true, "Sub Category reference is required"],
+        },
         stock: {
             type: Number,
             default: 0,

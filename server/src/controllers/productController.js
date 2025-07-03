@@ -4,8 +4,7 @@ import { SERVER_IMAGE_URL } from '../services/config.js';
 
 export const createProduct = async (req, res) => {
     try {
-        const { title, description, category, stock, weightOrCount, tag, types, mainImageIndex } = req.body;
-
+        const { title, description, category, stock, weightOrCount, tag, types, mainImageIndex, topCategory, subCategory } = req.body;
         if (!title || !description || !category || !weightOrCount || !types || !req.files || mainImageIndex === undefined) {
             return res.status(400).json({ error: 'All fields are required' });
         }
@@ -15,7 +14,7 @@ export const createProduct = async (req, res) => {
             }
             return `${SERVER_IMAGE_URL}/uploads/${file.filename}`;
         });
-        console.log(images)
+        // console.log(images)
 
         if (mainImageIndex < 0 || mainImageIndex >= images.length) {
             return res.status(400).json({ error: 'Invalid mainImageIndex' });
@@ -34,6 +33,8 @@ export const createProduct = async (req, res) => {
             stock,
             weightOrCount,
             tag,
+            topCategory,
+            subCategory,
             imageUrl: images, // All images including the main image
             types: JSON.parse(types),
         });
@@ -47,7 +48,7 @@ export const createProduct = async (req, res) => {
 };
 
 // ✅ Get All Products
-export const getAllProducts = async (req, res) => {
+export const getAllProducts = async (_req, res) => {
     try {
         // const cacheProducts = await redis.get('products');
         // if (cacheProducts) {
@@ -80,13 +81,13 @@ export const getProductById = async (req, res) => {
 
 export const updateProduct = async (req, res) => {
     try {
-        const { title, description, category, stock, weightOrCount, tag, types, mainImageIndex } = req.body;
+        const { title, description, category, stock, weightOrCount, tag, types, mainImageIndex, topCategory, subCategory } = req.body;
 
         if (!title || !description || !category || !weightOrCount || mainImageIndex === undefined) {
             return res.status(400).json({ error: 'All required fields must be provided' });
         }
 
-        const updateData = { title, description, category, stock, weightOrCount, tag };
+        const updateData = { title, description, category, stock, weightOrCount, tag, topCategory, subCategory };
 
         if (req.files && req.files.length > 0) {
             const images = req.files.map((file) => {
