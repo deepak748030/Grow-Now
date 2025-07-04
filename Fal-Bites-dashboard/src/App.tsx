@@ -28,7 +28,7 @@ import DeliveryPartnerVerificationPage from './pages/deliver-partner/DeliveryPar
 import ReviewsManagementPage from './pages/reviews/ReviewsManagementPage';
 import BoxManagementPage from './pages/box/BoxInfoPage';
 import TopCategoriesPage from './pages/categories/TopCategoriesPage';
-import SubCategoriesPage from './pages/categories/SubCAtegoriesPage';
+import SubCategoriesPage from './pages/categories/SubCategoriesPage';
 // Theme wrapper component
 function ThemeWrapper({ children }: { children: React.ReactNode }) {
   const isDarkMode = useSelector((state: RootState) => state.theme.isDarkMode);
