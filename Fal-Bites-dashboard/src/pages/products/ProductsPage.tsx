@@ -46,7 +46,7 @@ interface Product {
   _id: string
   title: string
   description: string
-  category: string | Category
+  category: string | Category | null // Add null as possible value
   topCategory?: string | TopCategory
   subCategory?: string | SubCategory
   stock: number
@@ -164,6 +164,25 @@ const getSubCategories = async () => {
   }
 }
 
+// Helper functions to resolve IDs to names
+const getTopCategoryName = (topCategoryId: string | undefined, topCategories: TopCategory[]): string => {
+  if (!topCategoryId) return "No top category"
+  const topCategory = topCategories.find((cat) => cat._id === topCategoryId)
+  return topCategory ? topCategory.title : topCategoryId
+}
+
+const getSubCategoryName = (subCategoryId: string | undefined, subCategories: SubCategory[]): string => {
+  if (!subCategoryId) return "No sub category"
+  const subCategory = subCategories.find((cat) => cat._id === subCategoryId)
+  return subCategory ? subCategory.title : subCategoryId
+}
+
+const getCategoryName = (categoryId: string | null | undefined, categories: Category[]): string => {
+  if (!categoryId || categoryId === "null") return "No category"
+  const category = categories.find((cat) => cat._id === categoryId)
+  return category ? category.title : categoryId
+}
+
 // Zod Schema for Product Type
 const productTypeSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -176,7 +195,7 @@ const productTypeSchema = z.object({
 const productSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
-  category: z.string().min(1, "Category is required"),
+  category: z.string().optional(), // Make category optional
   topCategory: z.string().optional(),
   subCategory: z.string().optional(),
   stock: z.number().min(0, "Stock must be a positive number"),
@@ -580,13 +599,9 @@ export default function ProductPage() {
         setValue("category", categoryId)
 
         if (categoryId) {
-          // Filter top categories that belong to the selected category
-          // Handle both null and valid category objects
-          const filteredTopCategories = allTopCategories.filter((topCat) => {
-            return topCat.category && topCat.category._id === categoryId
-          })
-
-          setTopCategories(filteredTopCategories)
+          // Since products don't actually use categories in your data,
+          // we'll show all top categories when a category is selected
+          setTopCategories(allTopCategories)
 
           // Reset dependent fields
           setValue("topCategory", "")
@@ -732,7 +747,12 @@ export default function ProductPage() {
       Object.entries(data).forEach(([key, value]) => {
         if (key !== "types" && key !== "image") {
           if (value !== undefined && value !== "") {
-            formData.append(key, String(value))
+            // Handle category - if empty string, send null
+            if (key === "category" && value === "") {
+              formData.append(key, "null")
+            } else {
+              formData.append(key, String(value))
+            }
           }
         }
       })
@@ -802,30 +822,31 @@ export default function ProductPage() {
       setValue("title", fullProduct.title)
       setValue("description", fullProduct.description)
 
-      const categoryId = typeof fullProduct.category === "object" ? fullProduct.category._id : fullProduct.category
+      // Handle null category - set to empty string for form
+      const categoryId = fullProduct.category
+        ? typeof fullProduct.category === "object"
+          ? fullProduct.category._id
+          : fullProduct.category
+        : ""
       setValue("category", categoryId)
 
-      // Handle cascading dropdowns for editing
-      if (categoryId) {
-        const filteredTopCategories = allTopCategories.filter((topCat) => {
-          return topCat.category && topCat.category._id === categoryId
+      // Since your data structure has top categories independent of main categories,
+      // show all top categories
+      setTopCategories(allTopCategories)
+
+      const topCategoryId =
+        typeof fullProduct.topCategory === "object" ? fullProduct.topCategory._id : fullProduct.topCategory || ""
+      setValue("topCategory", topCategoryId)
+
+      if (topCategoryId) {
+        const filteredSubCategories = allSubCategories.filter((subCat) => {
+          return subCat.topCategory && subCat.topCategory._id === topCategoryId
         })
-        setTopCategories(filteredTopCategories)
+        setSubCategories(filteredSubCategories)
 
-        const topCategoryId =
-          typeof fullProduct.topCategory === "object" ? fullProduct.topCategory._id : fullProduct.topCategory || ""
-        setValue("topCategory", topCategoryId)
-
-        if (topCategoryId) {
-          const filteredSubCategories = allSubCategories.filter((subCat) => {
-            return subCat.topCategory && subCat.topCategory._id === topCategoryId
-          })
-          setSubCategories(filteredSubCategories)
-
-          const subCategoryId =
-            typeof fullProduct.subCategory === "object" ? fullProduct.subCategory._id : fullProduct.subCategory || ""
-          setValue("subCategory", subCategoryId)
-        }
+        const subCategoryId =
+          typeof fullProduct.subCategory === "object" ? fullProduct.subCategory._id : fullProduct.subCategory || ""
+        setValue("subCategory", subCategoryId)
       }
 
       setValue("stock", fullProduct.stock)
@@ -1089,23 +1110,23 @@ export default function ProductPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-300">
-                              {typeof product.category === "object"
+                              {typeof product.category === "object" && product.category
                                 ? product.category.title
-                                : product.category || "No category"}
+                                : getCategoryName(product.category, categories)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-300">
-                              {typeof product.topCategory === "object"
+                              {typeof product.topCategory === "object" && product.topCategory
                                 ? product.topCategory.title
-                                : product.topCategory || "No top category"}
+                                : getTopCategoryName(product.topCategory, allTopCategories)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-300">
-                              {typeof product.subCategory === "object"
+                              {typeof product.subCategory === "object" && product.subCategory
                                 ? product.subCategory.title
-                                : product.subCategory || "No sub category"}
+                                : getSubCategoryName(product.subCategory, allSubCategories)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -1176,9 +1197,9 @@ export default function ProductPage() {
                           <div>
                             <h3 className="text-sm font-medium text-gray-100">{product.title}</h3>
                             <p className="text-xs text-gray-400">
-                              {typeof product.category === "object"
+                              {typeof product.category === "object" && product.category
                                 ? product.category.title
-                                : product.category || "No category"}
+                                : getCategoryName(product.category, categories)}
                             </p>
                           </div>
                         </div>
@@ -1205,17 +1226,17 @@ export default function ProductPage() {
                         <div>
                           <span className="text-gray-400">Top Category:</span>
                           <span className="ml-2 text-gray-100">
-                            {typeof product.topCategory === "object"
+                            {typeof product.topCategory === "object" && product.topCategory
                               ? product.topCategory.title
-                              : product.topCategory || "None"}
+                              : getTopCategoryName(product.topCategory, allTopCategories)}
                           </span>
                         </div>
                         <div>
                           <span className="text-gray-400">Sub Category:</span>
                           <span className="ml-2 text-gray-100">
-                            {typeof product.subCategory === "object"
+                            {typeof product.subCategory === "object" && product.subCategory
                               ? product.subCategory.title
-                              : product.subCategory || "None"}
+                              : getSubCategoryName(product.subCategory, allSubCategories)}
                           </span>
                         </div>
                         <div>
