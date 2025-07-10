@@ -30,6 +30,8 @@ type TopCategory = {
         title: string
         image?: string
     } | null
+    createdAt?: string
+    updatedAt?: string
 }
 
 export default function TopCategoriesPage() {
@@ -228,32 +230,24 @@ export default function TopCategoriesPage() {
                                 <div className="aspect-w-16 aspect-h-9">
                                     {topCategory.category?.image ? (
                                         <img
-                                            src={`${import.meta.env.VITE_API_URL}/${topCategory.category.image}`}
+                                            src={topCategory.category.image || "/placeholder.svg"}
                                             alt={topCategory.category.title}
                                             className="w-full h-48 object-cover"
                                         />
                                     ) : (
-                                        <div className="w-full h-48 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center">
-                                            <Tags className="h-12 w-12 text-blue-500 dark:text-gray-400" />
+                                        <div className="w-full h-48 bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                                            <Tags className="h-12 w-12 text-gray-400" />
                                         </div>
                                     )}
                                 </div>
                                 <div className="p-4">
                                     <div className="flex items-start justify-between">
                                         <div className="flex-1 min-w-0">
-                                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                                                {topCategory.title}
-                                            </h3>
+                                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{topCategory.title}</h3>
                                             <div className="mt-1">
-                                                {topCategory.category ? (
-                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                                        {topCategory.category.title}
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-                                                        No category
-                                                    </span>
-                                                )}
+                                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                                    Category: {topCategory.category?.title || "No category"}
+                                                </p>
                                             </div>
                                         </div>
                                         <div className="flex space-x-2 ml-2">
