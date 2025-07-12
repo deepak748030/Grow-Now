@@ -348,12 +348,14 @@ const TopCategoryDropdown = ({
   onChange,
   isLoading,
   placeholder = "Select a top category",
+  disabled = false,
 }: {
   topCategories: TopCategory[]
   value: string
   onChange: (topCategoryId: string) => void
   isLoading?: boolean
   placeholder?: string
+  disabled?: boolean
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -376,9 +378,10 @@ const TopCategoryDropdown = ({
     <div className="relative" ref={dropdownRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full h-12 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center justify-between"
-        disabled={isLoading}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`w-full h-12 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center justify-between ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+          }`}
+        disabled={isLoading || disabled}
       >
         <div className="flex items-center space-x-3">
           {selectedTopCategory ? (
@@ -387,19 +390,19 @@ const TopCategoryDropdown = ({
               {selectedTopCategory.category && ` (${selectedTopCategory.category.title})`}
             </span>
           ) : (
-            <span className="text-gray-400">{placeholder}</span>
+            <span className="text-gray-400">{disabled ? "Select a category first" : placeholder}</span>
           )}
         </div>
         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {isOpen && (
+      {isOpen && !disabled && (
         <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
           {isLoading ? (
             <div className="p-4 text-center text-gray-400">Loading top categories...</div>
           ) : topCategories.length === 0 ? (
-            <div className="p-4 text-center text-gray-400">No top categories available</div>
+            <div className="p-4 text-center text-gray-400">No top categories available for selected category</div>
           ) : (
             <>
               <button
@@ -443,12 +446,14 @@ const SubCategoryDropdown = ({
   onChange,
   isLoading,
   placeholder = "Select a sub category",
+  disabled = false,
 }: {
   subCategories: SubCategory[]
   value: string
   onChange: (subCategoryId: string) => void
   isLoading?: boolean
   placeholder?: string
+  disabled?: boolean
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -471,9 +476,10 @@ const SubCategoryDropdown = ({
     <div className="relative" ref={dropdownRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full h-12 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center justify-between"
-        disabled={isLoading}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`w-full h-12 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center justify-between ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+          }`}
+        disabled={isLoading || disabled}
       >
         <div className="flex items-center space-x-3">
           {selectedSubCategory ? (
@@ -494,19 +500,19 @@ const SubCategoryDropdown = ({
               </span>
             </>
           ) : (
-            <span className="text-gray-400">{placeholder}</span>
+            <span className="text-gray-400">{disabled ? "Select a top category first" : placeholder}</span>
           )}
         </div>
         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {isOpen && (
+      {isOpen && !disabled && (
         <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
           {isLoading ? (
             <div className="p-4 text-center text-gray-400">Loading sub categories...</div>
           ) : subCategories.length === 0 ? (
-            <div className="p-4 text-center text-gray-400">No sub categories available</div>
+            <div className="p-4 text-center text-gray-400">No sub categories available for selected top category</div>
           ) : (
             <>
               <button
@@ -599,15 +605,18 @@ export default function ProductPage() {
         setValue("category", categoryId)
 
         if (categoryId) {
-          // Since products don't actually use categories in your data,
-          // we'll show all top categories when a category is selected
-          setTopCategories(allTopCategories)
+          // Filter top categories that belong to the selected category
+          const filteredTopCategories = allTopCategories.filter((topCat) => {
+            return topCat.category && topCat.category._id === categoryId
+          })
+          setTopCategories(filteredTopCategories)
 
           // Reset dependent fields
           setValue("topCategory", "")
           setValue("subCategory", "")
           setSubCategories([])
         } else {
+          // If no category selected, clear all dependent dropdowns
           setTopCategories([])
           setSubCategories([])
           setValue("topCategory", "")
@@ -628,6 +637,7 @@ export default function ProductPage() {
         setValue("topCategory", topCategoryId)
 
         if (topCategoryId) {
+          // Filter sub categories that belong to the selected top category
           const filteredSubCategories = allSubCategories.filter((subCat) => {
             return subCat.topCategory && subCat.topCategory._id === topCategoryId
           })
@@ -636,6 +646,7 @@ export default function ProductPage() {
           // Reset sub category
           setValue("subCategory", "")
         } else {
+          // If no top category selected, clear sub categories
           setSubCategories([])
           setValue("subCategory", "")
         }
@@ -822,7 +833,7 @@ export default function ProductPage() {
       setValue("title", fullProduct.title)
       setValue("description", fullProduct.description)
 
-      // Handle null category - set to empty string for form
+      // Handle category selection and filtering
       const categoryId = fullProduct.category
         ? typeof fullProduct.category === "object"
           ? fullProduct.category._id
@@ -830,14 +841,22 @@ export default function ProductPage() {
         : ""
       setValue("category", categoryId)
 
-      // Since your data structure has top categories independent of main categories,
-      // show all top categories
-      setTopCategories(allTopCategories)
+      // Filter top categories based on selected category
+      if (categoryId && categoryId !== "null") {
+        const filteredTopCategories = allTopCategories.filter((topCat) => {
+          return topCat.category && topCat.category._id === categoryId
+        })
+        setTopCategories(filteredTopCategories)
+      } else {
+        setTopCategories([])
+      }
 
+      // Handle top category selection and filtering
       const topCategoryId =
         typeof fullProduct.topCategory === "object" ? fullProduct.topCategory._id : fullProduct.topCategory || ""
       setValue("topCategory", topCategoryId)
 
+      // Filter sub categories based on selected top category
       if (topCategoryId) {
         const filteredSubCategories = allSubCategories.filter((subCat) => {
           return subCat.topCategory && subCat.topCategory._id === topCategoryId
@@ -847,6 +866,9 @@ export default function ProductPage() {
         const subCategoryId =
           typeof fullProduct.subCategory === "object" ? fullProduct.subCategory._id : fullProduct.subCategory || ""
         setValue("subCategory", subCategoryId)
+      } else {
+        setSubCategories([])
+        setValue("subCategory", "")
       }
 
       setValue("stock", fullProduct.stock)
@@ -1312,9 +1334,21 @@ export default function ProductPage() {
                     value={watch("topCategory") || ""}
                     onChange={handleTopCategoryChange}
                     isLoading={isCategoriesLoading}
+                    disabled={!watch("category") || watch("category") === ""}
+                    placeholder={
+                      !watch("category") || watch("category") === ""
+                        ? "Select a category first"
+                        : "Select a top category"
+                    }
                   />
                   {errors.topCategory && <p className="mt-2 text-sm text-red-400">{errors.topCategory.message}</p>}
+                  {watch("category") && topCategories.length === 0 && (
+                    <p className="mt-2 text-sm text-yellow-400">
+                      No top categories available for the selected category.
+                    </p>
+                  )}
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Sub Category</label>
                   <SubCategoryDropdown
@@ -1322,8 +1356,19 @@ export default function ProductPage() {
                     value={watch("subCategory") || ""}
                     onChange={handleSubCategoryChange}
                     isLoading={isCategoriesLoading}
+                    disabled={!watch("topCategory") || watch("topCategory") === ""}
+                    placeholder={
+                      !watch("topCategory") || watch("topCategory") === ""
+                        ? "Select a top category first"
+                        : "Select a sub category"
+                    }
                   />
                   {errors.subCategory && <p className="mt-2 text-sm text-red-400">{errors.subCategory.message}</p>}
+                  {watch("topCategory") && subCategories.length === 0 && (
+                    <p className="mt-2 text-sm text-yellow-400">
+                      No sub categories available for the selected top category.
+                    </p>
+                  )}
                 </div>
               </div>
               <div>
