@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Package, AlertCircle, CheckCircle, Edit, X } from "lucide-react"
 
-// Define types
+// Define types based on actual API response
 type User = {
     _id: string
     mobileNumber: string
@@ -15,12 +15,12 @@ type ProductData = {
     title: string
     weightOrCount: string
     imageUrl: string[] | string
-}
+} | null
 
 type ProductOrder = {
     _id: string
     userId: User
-    deliveryPartnerId: string
+    deliveryPartnerId?: string
     productData: ProductData
     selectedType: string
     quantity: number
@@ -39,13 +39,15 @@ type ProductOrder = {
         floor?: string
         landmark?: string
     }
-    locationName?: string
-    locationLat?: number
-    locationLng?: number
-    locationType?: string
     orderTimeStamps: number
     createdAt: string
     updatedAt: string
+    gstAmount?: number
+    deliveryFees?: number
+    platformFees?: number
+    bonusUsed?: number
+    assignedFranchiseId?: string
+    amountEarnedByDeliveryPartner?: number
 }
 
 type ApiResponse = {
@@ -71,16 +73,13 @@ export default function ProductOrdersPage() {
     async function fetchOrders() {
         setLoading(true)
         setError(null)
-
         try {
-            // Use import.meta.env for Vite environment variables
+            // Use process.env for Next.js environment variables
             const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000"
             const response = await fetch(`${apiUrl}/product-order`, {
                 method: "GET",
             })
-
             const result: ApiResponse = await response.json()
-
             if (result.success) {
                 setOrders(result.data)
             } else {
@@ -96,7 +95,7 @@ export default function ProductOrdersPage() {
 
     async function handleStatusChange(orderId: string, newStatus: string) {
         try {
-            // Use import.meta.env for Vite environment variables
+            // Use process.env for Next.js environment variables
             const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000"
             const response = await fetch(`${apiUrl}/product-order/${orderId}`, {
                 method: "PATCH",
@@ -107,9 +106,7 @@ export default function ProductOrdersPage() {
                     status: newStatus,
                 }),
             })
-
             const result = await response.json()
-
             if (result.success) {
                 // Update local state to reflect the change
                 setOrders((prevOrders) =>
@@ -123,9 +120,7 @@ export default function ProductOrdersPage() {
                         return order
                     }),
                 )
-
                 setSuccessMessage("Order status updated successfully")
-
                 // Clear success message after 3 seconds
                 setTimeout(() => {
                     setSuccessMessage(null)
@@ -154,6 +149,7 @@ export default function ProductOrdersPage() {
                 return "bg-green-600 text-green-100"
             case "pending":
             case "order placed":
+            case "processing":
             case "in transit":
             case "out-for-delivery":
                 return "bg-yellow-600 text-yellow-100"
@@ -180,7 +176,6 @@ export default function ProductOrdersPage() {
 
     async function handleEditSubmit() {
         if (!currentOrder) return
-
         await handleStatusChange(currentOrder._id, editedStatus)
         closeEditModal()
     }
@@ -208,7 +203,6 @@ export default function ProductOrdersPage() {
                 {/* Order List */}
                 <div className="bg-[#1a2236] p-6 rounded-lg border border-[#2a3349] shadow-lg">
                     <h2 className="text-xl font-semibold mb-4">Product Order List</h2>
-
                     {loading ? (
                         <div className="text-center py-8">
                             <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-400 border-r-transparent"></div>
@@ -226,9 +220,10 @@ export default function ProductOrdersPage() {
                                     <tr className="bg-[#2a3349] text-left text-gray-300">
                                         <th className="p-4 text-sm">Order ID</th>
                                         <th className="p-4 text-sm">Customer</th>
-                                        <th className="p-4 text-sm">Product</th>
+                                        <th className="p-4 text-sm">Product Info</th>
                                         <th className="p-4 text-sm">Quantity</th>
                                         <th className="p-4 text-sm">Total Price</th>
+                                        <th className="p-4 text-sm">Payment Method</th>
                                         <th className="p-4 text-sm">Order Date</th>
                                         <th className="p-4 text-sm">Status</th>
                                         <th className="p-4 text-sm">Action</th>
@@ -248,28 +243,25 @@ export default function ProductOrdersPage() {
                                                 </div>
                                             </td>
                                             <td className="p-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-md bg-[#2a3349] overflow-hidden">
-                                                        <img
-                                                            src={
-                                                                order.productData.imageUrl
-                                                                    ? Array.isArray(order.productData.imageUrl)
-                                                                        ? order.productData.imageUrl[0]
-                                                                        : order.productData.imageUrl
-                                                                    : "/placeholder.svg"
-                                                            }
-                                                            alt={order.productData.title}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col">
-                                                        <span className="font-medium">{order.productData.title}</span>
-                                                        <span className="text-gray-400 text-xs">{order.productData.weightOrCount}</span>
-                                                    </div>
+                                                <div className="flex flex-col">
+                                                    {order.productData ? (
+                                                        <>
+                                                            <span className="font-medium">{order.productData.title}</span>
+                                                            <span className="text-gray-400 text-xs">{order.productData.weightOrCount}</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span className="font-medium">Product Type: {order.selectedType}</span>
+                                                            <span className="text-gray-400 text-xs">Product data not available</span>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="p-4">{order.quantity}</td>
                                             <td className="p-4 font-medium">₹{order.totalPrice}</td>
+                                            <td className="p-4">
+                                                <span className="text-sm">{order.paymentMethod}</span>
+                                            </td>
                                             <td className="p-4">{formatDate(order.orderDate)}</td>
                                             <td className="p-4">
                                                 <span
@@ -284,12 +276,12 @@ export default function ProductOrdersPage() {
                                                     value={order.status}
                                                     onChange={(e) => handleStatusChange(order._id, e.target.value)}
                                                 >
-                                                    <option value="pending">Pending</option>
-                                                    <option value="processing">Processing</option>
-                                                    <option value="in transit">In Transit</option>
-                                                    <option value="out-for-delivery">Out For Delivery</option>
-                                                    <option value="delivered">Delivered</option>
-                                                    <option value="cancelled">Cancelled</option>
+                                                    <option value="Pending">Pending</option>
+                                                    <option value="Processing">Processing</option>
+                                                    <option value="In Transit">In Transit</option>
+                                                    <option value="Out For Delivery">Out For Delivery</option>
+                                                    <option value="Delivered">Delivered</option>
+                                                    <option value="Cancelled">Cancelled</option>
                                                 </select>
                                                 <button
                                                     onClick={() => openEditModal(order)}
@@ -306,6 +298,8 @@ export default function ProductOrdersPage() {
                     )}
                 </div>
             </div>
+
+            {/* Edit Modal */}
             {isEditModalOpen && currentOrder && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-[#1a2236] p-6 rounded-lg border border-[#2a3349] shadow-lg w-full max-w-md">
@@ -315,16 +309,17 @@ export default function ProductOrdersPage() {
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
-
                         <div className="mb-4">
                             <p className="text-gray-400 mb-2">Order ID: #{currentOrder._id.slice(-6)}</p>
                             <p className="mb-2">
-                                <span className="font-medium">Product:</span> {currentOrder.productData.title}
+                                <span className="font-medium">Product Type:</span> {currentOrder.selectedType}
                             </p>
-                            <p className="mb-4">
+                            <p className="mb-2">
                                 <span className="font-medium">Customer:</span> {currentOrder.userId?.name || "N/A"}
                             </p>
-
+                            <p className="mb-4">
+                                <span className="font-medium">Total Price:</span> ₹{currentOrder.totalPrice}
+                            </p>
                             <div className="mb-4">
                                 <label className="block text-sm font-medium mb-2">Status</label>
                                 <select
@@ -332,16 +327,15 @@ export default function ProductOrdersPage() {
                                     value={editedStatus}
                                     onChange={(e) => setEditedStatus(e.target.value)}
                                 >
-                                    <option value="pending">Pending</option>
-                                    <option value="processing">Processing</option>
-                                    <option value="in transit">In Transit</option>
-                                    <option value="out-for-delivery">Out For Delivery</option>
-                                    <option value="delivered">Delivered</option>
-                                    <option value="cancelled">Cancelled</option>
+                                    <option value="Pending">Pending</option>
+                                    <option value="Processing">Processing</option>
+                                    <option value="In Transit">In Transit</option>
+                                    <option value="Out For Delivery">Out For Delivery</option>
+                                    <option value="Delivered">Delivered</option>
+                                    <option value="Cancelled">Cancelled</option>
                                 </select>
                             </div>
                         </div>
-
                         <div className="flex justify-end gap-2">
                             <button
                                 onClick={closeEditModal}
