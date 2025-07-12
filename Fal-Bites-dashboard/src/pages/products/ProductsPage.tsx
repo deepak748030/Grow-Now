@@ -1,12 +1,11 @@
 "use client"
-
 import type React from "react"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import axios from "axios"
-import { Package, Plus, Pencil, Trash2, X, Menu, Loader2, IndianRupee, Search } from "lucide-react"
+import { Package, Plus, Pencil, Trash2, X, Menu, Loader2, IndianRupee, Search, FolderPlus } from "lucide-react"
 
 // Types and Interfaces
 interface ProductType {
@@ -46,7 +45,7 @@ interface Product {
   _id: string
   title: string
   description: string
-  category: string | Category | null // Add null as possible value
+  category: string | Category | null
   topCategory?: string | TopCategory
   subCategory?: string | SubCategory
   stock: number
@@ -68,7 +67,7 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000/api",
 })
 
-// API Functions with error handling
+// Existing API Functions
 const getProducts = async () => {
   try {
     const response = await api.get<ApiResponse<Product>>("/products")
@@ -164,7 +163,44 @@ const getSubCategories = async () => {
   }
 }
 
-// Helper functions to resolve IDs to names
+// New API Functions for Creating Categories
+const createCategory = async (formData: FormData) => {
+  try {
+    const response = await api.post("/categories", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+    return response.data.data
+  } catch (error) {
+    console.error("Failed to create category:", error)
+    throw error
+  }
+}
+
+const createTopCategory = async (data: { title: string; category: string }) => {
+  try {
+    const response = await api.post("/top-categories", data, {
+      headers: { "Content-Type": "application/json" },
+    })
+    return response.data.data
+  } catch (error) {
+    console.error("Failed to create top category:", error)
+    throw error
+  }
+}
+
+const createSubCategory = async (formData: FormData) => {
+  try {
+    const response = await api.post("/sub-categories", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+    return response.data.data
+  } catch (error) {
+    console.error("Failed to create sub category:", error)
+    throw error
+  }
+}
+
+// Helper functions
 const getTopCategoryName = (topCategoryId: string | undefined, topCategories: TopCategory[]): string => {
   if (!topCategoryId) return "No top category"
   const topCategory = topCategories.find((cat) => cat._id === topCategoryId)
@@ -183,7 +219,7 @@ const getCategoryName = (categoryId: string | null | undefined, categories: Cate
   return category ? category.title : categoryId
 }
 
-// Zod Schema for Product Type
+// Zod Schemas
 const productTypeSchema = z.object({
   title: z.string().min(1, "Title is required"),
   price: z.number().min(0, "Price must be a positive number"),
@@ -191,11 +227,10 @@ const productTypeSchema = z.object({
   smallDescription: z.string().max(200, "Small description cannot exceed 200 characters"),
 })
 
-// Zod Schema for Product
 const productSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
-  category: z.string().optional(), // Make category optional
+  category: z.string().optional(),
   topCategory: z.string().optional(),
   subCategory: z.string().optional(),
   stock: z.number().min(0, "Stock must be a positive number"),
@@ -207,7 +242,24 @@ const productSchema = z.object({
   types: z.array(productTypeSchema).min(1, "At least one product type is required"),
 })
 
+const categorySchema = z.object({
+  title: z.string().min(1, "Title is required"),
+})
+
+const topCategorySchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  category: z.string().min(1, "Category is required"),
+})
+
+const subCategorySchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  topCategory: z.string().min(1, "Top Category is required"),
+})
+
 type ProductFormData = z.infer<typeof productSchema>
+type CategoryFormData = z.infer<typeof categorySchema>
+type TopCategoryFormData = z.infer<typeof topCategorySchema>
+type SubCategoryFormData = z.infer<typeof subCategorySchema>
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
@@ -224,7 +276,476 @@ const EmptyState = ({ message }: { message: string }) => (
   </div>
 )
 
-// Custom Category Dropdown Component
+// Category Creation Modal
+const CategoryCreateModal = ({
+  isOpen,
+  onClose,
+  onSuccess,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+}) => {
+  const [isLoading, setIsLoading] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string>("")
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<CategoryFormData>({
+    resolver: zodResolver(categorySchema),
+  })
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      setImageFile(file)
+      const previewUrl = URL.createObjectURL(file)
+      setImagePreview(previewUrl)
+    }
+  }
+
+  const removeImage = () => {
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview)
+    }
+    setImageFile(null)
+    setImagePreview("")
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  const onSubmit = async (data: CategoryFormData) => {
+    setIsLoading(true)
+    try {
+      const formData = new FormData()
+      formData.append("title", data.title)
+      if (imageFile) {
+        formData.append("image", imageFile)
+      }
+
+      await createCategory(formData)
+      onSuccess()
+      reset()
+      removeImage()
+      onClose()
+    } catch (error) {
+      console.error("Failed to create category:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleClose = () => {
+    reset()
+    removeImage()
+    onClose()
+  }
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview)
+      }
+    }
+  }, [imagePreview])
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-900 rounded-lg w-full max-w-md border border-gray-800">
+        <div className="px-6 py-4 border-b border-gray-800">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-gray-100">Create New Category</h2>
+            <button onClick={handleClose} className="text-gray-400 hover:text-gray-200 transition-colors">
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
+            <input
+              {...register("title")}
+              className="w-full h-12 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Enter category title"
+            />
+            {errors.title && <p className="mt-2 text-sm text-red-400">{errors.title.message}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Image (Optional)</label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-gray-900 hover:file:bg-blue-600"
+            />
+            {imagePreview && (
+              <div className="mt-4 relative inline-block">
+                <img
+                  src={imagePreview || "/placeholder.svg"}
+                  alt="Preview"
+                  className="h-24 w-24 object-cover rounded-lg"
+                />
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full text-white hover:bg-red-600 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end space-x-4 pt-4">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors"
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-4 py-2 rounded-lg bg-blue-500 text-gray-900 font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Category"
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// Top Category Creation Modal
+const TopCategoryCreateModal = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  categories,
+  selectedCategoryId,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+  categories: Category[]
+  selectedCategoryId?: string
+}) => {
+  const [isLoading, setIsLoading] = useState(false)
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    formState: { errors },
+  } = useForm<TopCategoryFormData>({
+    resolver: zodResolver(topCategorySchema),
+  })
+
+  useEffect(() => {
+    if (selectedCategoryId) {
+      setValue("category", selectedCategoryId)
+    }
+  }, [selectedCategoryId, setValue])
+
+  const onSubmit = async (data: TopCategoryFormData) => {
+    setIsLoading(true)
+    try {
+      await createTopCategory(data)
+      onSuccess()
+      reset()
+      onClose()
+    } catch (error) {
+      console.error("Failed to create top category:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleClose = () => {
+    reset()
+    onClose()
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-900 rounded-lg w-full max-w-md border border-gray-800">
+        <div className="px-6 py-4 border-b border-gray-800">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-gray-100">Create New Top Category</h2>
+            <button onClick={handleClose} className="text-gray-400 hover:text-gray-200 transition-colors">
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
+            <input
+              {...register("title")}
+              className="w-full h-12 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Enter top category title"
+            />
+            {errors.title && <p className="mt-2 text-sm text-red-400">{errors.title.message}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
+            <select
+              {...register("category")}
+              className="w-full h-12 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Select a category</option>
+              {categories.map((category) => (
+                <option key={category._id} value={category._id}>
+                  {category.title}
+                </option>
+              ))}
+            </select>
+            {errors.category && <p className="mt-2 text-sm text-red-400">{errors.category.message}</p>}
+          </div>
+
+          <div className="flex justify-end space-x-4 pt-4">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors"
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-4 py-2 rounded-lg bg-blue-500 text-gray-900 font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Top Category"
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// Sub Category Creation Modal
+const SubCategoryCreateModal = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  topCategories,
+  selectedTopCategoryId,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+  topCategories: TopCategory[]
+  selectedTopCategoryId?: string
+}) => {
+  const [isLoading, setIsLoading] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string>("")
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    formState: { errors },
+  } = useForm<SubCategoryFormData>({
+    resolver: zodResolver(subCategorySchema),
+  })
+
+  useEffect(() => {
+    if (selectedTopCategoryId) {
+      setValue("topCategory", selectedTopCategoryId)
+    }
+  }, [selectedTopCategoryId, setValue])
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      setImageFile(file)
+      const previewUrl = URL.createObjectURL(file)
+      setImagePreview(previewUrl)
+    }
+  }
+
+  const removeImage = () => {
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview)
+    }
+    setImageFile(null)
+    setImagePreview("")
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  const onSubmit = async (data: SubCategoryFormData) => {
+    setIsLoading(true)
+    try {
+      const formData = new FormData()
+      formData.append("title", data.title)
+      formData.append("topCategory", data.topCategory)
+      if (imageFile) {
+        formData.append("image", imageFile)
+      }
+
+      await createSubCategory(formData)
+      onSuccess()
+      reset()
+      removeImage()
+      onClose()
+    } catch (error) {
+      console.error("Failed to create sub category:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleClose = () => {
+    reset()
+    removeImage()
+    onClose()
+  }
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview)
+      }
+    }
+  }, [imagePreview])
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-900 rounded-lg w-full max-w-md border border-gray-800">
+        <div className="px-6 py-4 border-b border-gray-800">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-gray-100">Create New Sub Category</h2>
+            <button onClick={handleClose} className="text-gray-400 hover:text-gray-200 transition-colors">
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
+            <input
+              {...register("title")}
+              className="w-full h-12 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Enter sub category title"
+            />
+            {errors.title && <p className="mt-2 text-sm text-red-400">{errors.title.message}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Top Category</label>
+            <select
+              {...register("topCategory")}
+              className="w-full h-12 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Select a top category</option>
+              {topCategories.map((topCategory) => (
+                <option key={topCategory._id} value={topCategory._id}>
+                  {topCategory.title} {topCategory.category && `(${topCategory.category.title})`}
+                </option>
+              ))}
+            </select>
+            {errors.topCategory && <p className="mt-2 text-sm text-red-400">{errors.topCategory.message}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Image (Optional)</label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-gray-900 hover:file:bg-blue-600"
+            />
+            {imagePreview && (
+              <div className="mt-4 relative inline-block">
+                <img
+                  src={imagePreview || "/placeholder.svg"}
+                  alt="Preview"
+                  className="h-24 w-24 object-cover rounded-lg"
+                />
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full text-white hover:bg-red-600 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end space-x-4 pt-4">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors"
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-4 py-2 rounded-lg bg-blue-500 text-gray-900 font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Sub Category"
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// Enhanced Category Dropdown Component
 const CategoryDropdown = ({
   categories,
   value,
@@ -232,6 +753,7 @@ const CategoryDropdown = ({
   isLoading,
   error,
   placeholder = "Select a category",
+  onCreateNew,
 }: {
   categories: Category[]
   value: string
@@ -239,19 +761,18 @@ const CategoryDropdown = ({
   isLoading?: boolean
   error?: string
   placeholder?: string
+  onCreateNew?: () => void
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const selectedCategory = categories.find((cat) => cat._id === value)
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false)
       }
     }
-
     document.addEventListener("mousedown", handleClickOutside)
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
@@ -288,16 +809,28 @@ const CategoryDropdown = ({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
+
       {isOpen && (
         <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
           {isLoading ? (
             <div className="p-4 text-center text-gray-400">Loading categories...</div>
           ) : error ? (
             <div className="p-4 text-center text-red-400">Error loading categories</div>
-          ) : categories.length === 0 ? (
-            <div className="p-4 text-center text-gray-400">No categories available</div>
           ) : (
             <>
+              {onCreateNew && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCreateNew()
+                    setIsOpen(false)
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center space-x-3 border-b border-gray-700"
+                >
+                  <FolderPlus className="w-5 h-5 text-blue-400" />
+                  <span className="text-blue-400 font-medium">Create New Category</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -341,7 +874,7 @@ const CategoryDropdown = ({
   )
 }
 
-// Custom Top Category Dropdown Component
+// Enhanced Top Category Dropdown Component
 const TopCategoryDropdown = ({
   topCategories,
   value,
@@ -349,6 +882,8 @@ const TopCategoryDropdown = ({
   isLoading,
   placeholder = "Select a top category",
   disabled = false,
+  onCreateNew,
+  selectedCategoryId,
 }: {
   topCategories: TopCategory[]
   value: string
@@ -356,6 +891,8 @@ const TopCategoryDropdown = ({
   isLoading?: boolean
   placeholder?: string
   disabled?: boolean
+  onCreateNew?: (categoryId?: string) => void
+  selectedCategoryId?: string
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -367,7 +904,6 @@ const TopCategoryDropdown = ({
         setIsOpen(false)
       }
     }
-
     document.addEventListener("mousedown", handleClickOutside)
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
@@ -397,14 +933,26 @@ const TopCategoryDropdown = ({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
+
       {isOpen && !disabled && (
         <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
           {isLoading ? (
             <div className="p-4 text-center text-gray-400">Loading top categories...</div>
-          ) : topCategories.length === 0 ? (
-            <div className="p-4 text-center text-gray-400">No top categories available for selected category</div>
           ) : (
             <>
+              {onCreateNew && selectedCategoryId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCreateNew(selectedCategoryId)
+                    setIsOpen(false)
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center space-x-3 border-b border-gray-700"
+                >
+                  <FolderPlus className="w-5 h-5 text-blue-400" />
+                  <span className="text-blue-400 font-medium">Create New Top Category</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -415,22 +963,26 @@ const TopCategoryDropdown = ({
               >
                 <span className="text-gray-400">No top category</span>
               </button>
-              {topCategories.map((topCategory) => (
-                <button
-                  key={topCategory._id}
-                  type="button"
-                  onClick={() => {
-                    onChange(topCategory._id)
-                    setIsOpen(false)
-                  }}
-                  className="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center space-x-3"
-                >
-                  <span>
-                    {topCategory.title}
-                    {topCategory.category && ` (${topCategory.category.title})`}
-                  </span>
-                </button>
-              ))}
+              {topCategories.length === 0 ? (
+                <div className="p-4 text-center text-gray-400">No top categories available for selected category</div>
+              ) : (
+                topCategories.map((topCategory) => (
+                  <button
+                    key={topCategory._id}
+                    type="button"
+                    onClick={() => {
+                      onChange(topCategory._id)
+                      setIsOpen(false)
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center space-x-3"
+                  >
+                    <span>
+                      {topCategory.title}
+                      {topCategory.category && ` (${topCategory.category.title})`}
+                    </span>
+                  </button>
+                ))
+              )}
             </>
           )}
         </div>
@@ -439,7 +991,7 @@ const TopCategoryDropdown = ({
   )
 }
 
-// Custom Sub Category Dropdown Component
+// Enhanced Sub Category Dropdown Component
 const SubCategoryDropdown = ({
   subCategories,
   value,
@@ -447,6 +999,9 @@ const SubCategoryDropdown = ({
   isLoading,
   placeholder = "Select a sub category",
   disabled = false,
+  onCreateNew,
+  selectedTopCategoryId,
+  topCategories,
 }: {
   subCategories: SubCategory[]
   value: string
@@ -454,6 +1009,9 @@ const SubCategoryDropdown = ({
   isLoading?: boolean
   placeholder?: string
   disabled?: boolean
+  onCreateNew?: (topCategoryId?: string) => void
+  selectedTopCategoryId?: string
+  topCategories?: TopCategory[]
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -465,7 +1023,6 @@ const SubCategoryDropdown = ({
         setIsOpen(false)
       }
     }
-
     document.addEventListener("mousedown", handleClickOutside)
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
@@ -507,14 +1064,26 @@ const SubCategoryDropdown = ({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
+
       {isOpen && !disabled && (
         <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
           {isLoading ? (
             <div className="p-4 text-center text-gray-400">Loading sub categories...</div>
-          ) : subCategories.length === 0 ? (
-            <div className="p-4 text-center text-gray-400">No sub categories available for selected top category</div>
           ) : (
             <>
+              {onCreateNew && selectedTopCategoryId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCreateNew(selectedTopCategoryId)
+                    setIsOpen(false)
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center space-x-3 border-b border-gray-700"
+                >
+                  <FolderPlus className="w-5 h-5 text-blue-400" />
+                  <span className="text-blue-400 font-medium">Create New Sub Category</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -525,32 +1094,38 @@ const SubCategoryDropdown = ({
               >
                 <span className="text-gray-400">No sub category</span>
               </button>
-              {subCategories.map((subCategory) => (
-                <button
-                  key={subCategory._id}
-                  type="button"
-                  onClick={() => {
-                    onChange(subCategory._id)
-                    setIsOpen(false)
-                  }}
-                  className="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center space-x-3"
-                >
-                  {subCategory.image && (
-                    <img
-                      src={subCategory.image || "/placeholder.svg"}
-                      alt={subCategory.title}
-                      className="w-6 h-6 rounded object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.src = "/placeholder.svg"
-                      }}
-                    />
-                  )}
-                  <span>
-                    {subCategory.title} ({subCategory.topCategory.title})
-                  </span>
-                </button>
-              ))}
+              {subCategories.length === 0 ? (
+                <div className="p-4 text-center text-gray-400">
+                  No sub categories available for selected top category
+                </div>
+              ) : (
+                subCategories.map((subCategory) => (
+                  <button
+                    key={subCategory._id}
+                    type="button"
+                    onClick={() => {
+                      onChange(subCategory._id)
+                      setIsOpen(false)
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center space-x-3"
+                  >
+                    {subCategory.image && (
+                      <img
+                        src={subCategory.image || "/placeholder.svg"}
+                        alt={subCategory.title}
+                        className="w-6 h-6 rounded object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.src = "/placeholder.svg"
+                        }}
+                      />
+                    )}
+                    <span>
+                      {subCategory.title} ({subCategory.topCategory.title})
+                    </span>
+                  </button>
+                ))
+              )}
             </>
           )}
         </div>
@@ -579,10 +1154,15 @@ export default function ProductPage() {
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Reference to file input for resetting
+  // Modal states for creating categories
+  const [showCategoryCreateModal, setShowCategoryCreateModal] = useState(false)
+  const [showTopCategoryCreateModal, setShowTopCategoryCreateModal] = useState(false)
+  const [showSubCategoryCreateModal, setShowSubCategoryCreateModal] = useState(false)
+  const [createModalCategoryId, setCreateModalCategoryId] = useState<string>("")
+  const [createModalTopCategoryId, setCreateModalTopCategoryId] = useState<string>("")
+
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Form for the main product
   const {
     register,
     handleSubmit,
@@ -598,25 +1178,39 @@ export default function ProductPage() {
     },
   })
 
-  // Memoized callback for handling category changes
+  // Refresh all data function
+  const refreshAllData = async () => {
+    try {
+      setIsCategoriesLoading(true)
+      const [categoriesData, topCategoriesData, subCategoriesData] = await Promise.all([
+        getCategories(),
+        getTopCategories(),
+        getSubCategories(),
+      ])
+      setCategories(categoriesData)
+      setAllTopCategories(topCategoriesData)
+      setAllSubCategories(subCategoriesData)
+    } catch (error) {
+      console.error("Failed to refresh data:", error)
+      setError("Failed to refresh data. Please try again.")
+    } finally {
+      setIsCategoriesLoading(false)
+    }
+  }
+
   const handleCategoryChange = useCallback(
     (categoryId: string) => {
       try {
         setValue("category", categoryId)
-
         if (categoryId) {
-          // Filter top categories that belong to the selected category
           const filteredTopCategories = allTopCategories.filter((topCat) => {
             return topCat.category && topCat.category._id === categoryId
           })
           setTopCategories(filteredTopCategories)
-
-          // Reset dependent fields
           setValue("topCategory", "")
           setValue("subCategory", "")
           setSubCategories([])
         } else {
-          // If no category selected, clear all dependent dropdowns
           setTopCategories([])
           setSubCategories([])
           setValue("topCategory", "")
@@ -630,23 +1224,17 @@ export default function ProductPage() {
     [allTopCategories, setValue],
   )
 
-  // Memoized callback for handling top category changes
   const handleTopCategoryChange = useCallback(
     (topCategoryId: string) => {
       try {
         setValue("topCategory", topCategoryId)
-
         if (topCategoryId) {
-          // Filter sub categories that belong to the selected top category
           const filteredSubCategories = allSubCategories.filter((subCat) => {
             return subCat.topCategory && subCat.topCategory._id === topCategoryId
           })
           setSubCategories(filteredSubCategories)
-
-          // Reset sub category
           setValue("subCategory", "")
         } else {
-          // If no top category selected, clear sub categories
           setSubCategories([])
           setValue("subCategory", "")
         }
@@ -658,7 +1246,6 @@ export default function ProductPage() {
     [allSubCategories, setValue],
   )
 
-  // Memoized callback for handling sub category changes
   const handleSubCategoryChange = useCallback(
     (subCategoryId: string) => {
       try {
@@ -677,14 +1264,12 @@ export default function ProductPage() {
       try {
         setIsCategoriesLoading(true)
         setError(null)
-
         const [productsData, categoriesData, topCategoriesData, subCategoriesData] = await Promise.all([
           getProducts(),
           getCategories(),
           getTopCategories(),
           getSubCategories(),
         ])
-
         setProducts(productsData)
         setCategories(categoriesData)
         setAllTopCategories(topCategoriesData)
@@ -723,7 +1308,6 @@ export default function ProductPage() {
     return () => clearTimeout(debounceTimeout)
   }, [searchQuery, selectedCategoryId])
 
-  // Reset form completely
   const resetFormCompletely = () => {
     reset({
       title: "",
@@ -742,23 +1326,19 @@ export default function ProductPage() {
     setTopCategories([])
     setSubCategories([])
     setError(null)
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
   }
 
-  // Update the onSubmit function to handle multiple images
   const onSubmit = async (data: ProductFormData) => {
     setIsLoading(true)
     setError(null)
     try {
       const formData = new FormData()
-      // Append product data
       Object.entries(data).forEach(([key, value]) => {
         if (key !== "types" && key !== "image") {
           if (value !== undefined && value !== "") {
-            // Handle category - if empty string, send null
             if (key === "category" && value === "") {
               formData.append(key, "null")
             } else {
@@ -767,11 +1347,8 @@ export default function ProductPage() {
           }
         }
       })
-      // Append types as JSON
       formData.append("types", JSON.stringify(data.types))
-      // Append main image index
       formData.append("mainImageIndex", String(mainImageIndex))
-      // Append all images
       if (imageFiles.length > 0) {
         imageFiles.forEach((image) => {
           formData.append(`images`, image.file)
@@ -783,15 +1360,12 @@ export default function ProductPage() {
       } else {
         await createProduct(formData)
       }
-      // Refresh products list
+
       const productsData = await getProducts()
       setProducts(productsData)
-      // Extract unique categories
       const categoriesData = await getCategories()
       setCategories(categoriesData)
-      // Reset form and state
       resetFormCompletely()
-      // Close the form modal
       setShowForm(false)
     } catch (error) {
       console.error("Failed to save product:", error)
@@ -818,22 +1392,15 @@ export default function ProductPage() {
     }
   }
 
-  // Update the handleEdit function to load multiple images
   const handleEdit = async (product: Product) => {
     try {
       setError(null)
-      // First reset the form to clear any previous data
       resetFormCompletely()
-      // Fetch the full product details
       const fullProduct = await getProductById(product._id)
       console.log(fullProduct)
-      // Set the editing product state
       setEditingProduct(fullProduct)
-      // Set form values
       setValue("title", fullProduct.title)
       setValue("description", fullProduct.description)
-
-      // Handle category selection and filtering
       const categoryId = fullProduct.category
         ? typeof fullProduct.category === "object"
           ? fullProduct.category._id
@@ -841,7 +1408,6 @@ export default function ProductPage() {
         : ""
       setValue("category", categoryId)
 
-      // Filter top categories based on selected category
       if (categoryId && categoryId !== "null") {
         const filteredTopCategories = allTopCategories.filter((topCat) => {
           return topCat.category && topCat.category._id === categoryId
@@ -851,18 +1417,15 @@ export default function ProductPage() {
         setTopCategories([])
       }
 
-      // Handle top category selection and filtering
       const topCategoryId =
         typeof fullProduct.topCategory === "object" ? fullProduct.topCategory._id : fullProduct.topCategory || ""
       setValue("topCategory", topCategoryId)
 
-      // Filter sub categories based on selected top category
       if (topCategoryId) {
         const filteredSubCategories = allSubCategories.filter((subCat) => {
           return subCat.topCategory && subCat.topCategory._id === topCategoryId
         })
         setSubCategories(filteredSubCategories)
-
         const subCategoryId =
           typeof fullProduct.subCategory === "object" ? fullProduct.subCategory._id : fullProduct.subCategory || ""
         setValue("subCategory", subCategoryId)
@@ -874,9 +1437,8 @@ export default function ProductPage() {
       setValue("stock", fullProduct.stock)
       setValue("weightOrCount", fullProduct.weightOrCount)
       setValue("tag", fullProduct.tag ? fullProduct.tag[0] : "")
-      // Set main image index to 0 by default (first image is the main one)
       setMainImageIndex(0)
-      // Ensure types is properly set with all required fields
+
       if (fullProduct.types && fullProduct.types.length > 0) {
         setValue(
           "types",
@@ -888,7 +1450,7 @@ export default function ProductPage() {
           })),
         )
       }
-      // Open the form modal
+
       setShowForm(true)
     } catch (error) {
       console.error("Failed to fetch product details:", error)
@@ -896,14 +1458,12 @@ export default function ProductPage() {
     }
   }
 
-  // Update the handleFileChange function to handle multiple files
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
     if (files && files.length > 0) {
       const newImageFiles = [...imageFiles]
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        // Create a new object URL for the preview
         const previewUrl = URL.createObjectURL(file)
         newImageFiles.push({
           file,
@@ -914,15 +1474,11 @@ export default function ProductPage() {
     }
   }
 
-  // Update the removeImage function to remove a specific image
   const removeImage = (index: number) => {
     const newImageFiles = [...imageFiles]
-    // Revoke the object URL to avoid memory leaks
     URL.revokeObjectURL(newImageFiles[index].preview)
-    // Remove the image
     newImageFiles.splice(index, 1)
     setImageFiles(newImageFiles)
-    // Update main image index if needed
     if (mainImageIndex >= newImageFiles.length) {
       setMainImageIndex(Math.max(0, newImageFiles.length - 1))
     } else if (index === mainImageIndex && newImageFiles.length > 0) {
@@ -930,31 +1486,25 @@ export default function ProductPage() {
     }
   }
 
-  // Add a function to set the main image
   const setMainImage = (index: number) => {
     setMainImageIndex(index)
   }
 
-  // Clean up object URLs when component unmounts or when imagePreview changes
   useEffect(() => {
     return () => {
-      // Clean up all preview URLs when component unmounts
       imageFiles.forEach((image) => {
         URL.revokeObjectURL(image.preview)
       })
     }
   }, [])
 
-  // Watch product types for form validation
   const productTypes = watch("types")
 
-  // Add a new product type
   const addProductType = () => {
     const currentTypes = watch("types") || []
     setValue("types", [...currentTypes, { title: "", price: 0, withoutDiscountPrice: 0, smallDescription: "" }])
   }
 
-  // Remove a product type
   const removeProductType = (index: number) => {
     const currentTypes = watch("types") || []
     if (currentTypes.length > 1) {
@@ -965,17 +1515,58 @@ export default function ProductPage() {
     }
   }
 
-  // Close modal and reset form
   const handleCloseModal = () => {
     setShowForm(false)
     resetFormCompletely()
   }
 
-  // Stock status indicator
   const getStockStatus = (stock: number) => {
     if (stock <= 0) return { label: "Out of Stock", color: "bg-red-100 text-red-800" }
     if (stock < 10) return { label: "Low Stock", color: "bg-yellow-100 text-yellow-800" }
     return { label: "In Stock", color: "bg-green-100 text-green-800" }
+  }
+
+  // Handle create category modal
+  const handleCreateCategory = () => {
+    setShowCategoryCreateModal(true)
+  }
+
+  const handleCreateTopCategory = (categoryId?: string) => {
+    setCreateModalCategoryId(categoryId || "")
+    setShowTopCategoryCreateModal(true)
+  }
+
+  const handleCreateSubCategory = (topCategoryId?: string) => {
+    setCreateModalTopCategoryId(topCategoryId || "")
+    setShowSubCategoryCreateModal(true)
+  }
+
+  const handleCategoryCreateSuccess = async () => {
+    await refreshAllData()
+  }
+
+  const handleTopCategoryCreateSuccess = async () => {
+    await refreshAllData()
+    // Update the filtered top categories for the current category
+    const currentCategoryId = watch("category")
+    if (currentCategoryId) {
+      const filteredTopCategories = allTopCategories.filter((topCat) => {
+        return topCat.category && topCat.category._id === currentCategoryId
+      })
+      setTopCategories(filteredTopCategories)
+    }
+  }
+
+  const handleSubCategoryCreateSuccess = async () => {
+    await refreshAllData()
+    // Update the filtered sub categories for the current top category
+    const currentTopCategoryId = watch("topCategory")
+    if (currentTopCategoryId) {
+      const filteredSubCategories = allSubCategories.filter((subCat) => {
+        return subCat.topCategory && subCat.topCategory._id === currentTopCategoryId
+      })
+      setSubCategories(filteredSubCategories)
+    }
   }
 
   if (isInitialLoading) {
@@ -1060,6 +1651,7 @@ export default function ProductPage() {
             value={selectedCategoryId}
             onChange={(categoryId) => setSelectedCategoryId(categoryId)}
             isLoading={isCategoriesLoading}
+            onCreateNew={handleCreateCategory}
           />
         </div>
 
@@ -1322,6 +1914,7 @@ export default function ProductPage() {
                     value={watch("category") || ""}
                     onChange={handleCategoryChange}
                     isLoading={isCategoriesLoading}
+                    onCreateNew={handleCreateCategory}
                   />
                   {errors.category && <p className="mt-2 text-sm text-red-400">{errors.category.message}</p>}
                 </div>
@@ -1340,6 +1933,8 @@ export default function ProductPage() {
                         ? "Select a category first"
                         : "Select a top category"
                     }
+                    onCreateNew={handleCreateTopCategory}
+                    selectedCategoryId={watch("category")}
                   />
                   {errors.topCategory && <p className="mt-2 text-sm text-red-400">{errors.topCategory.message}</p>}
                   {watch("category") && topCategories.length === 0 && (
@@ -1348,7 +1943,6 @@ export default function ProductPage() {
                     </p>
                   )}
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Sub Category</label>
                   <SubCategoryDropdown
@@ -1362,6 +1956,9 @@ export default function ProductPage() {
                         ? "Select a top category first"
                         : "Select a sub category"
                     }
+                    onCreateNew={handleCreateSubCategory}
+                    selectedTopCategoryId={watch("topCategory")}
+                    topCategories={allTopCategories}
                   />
                   {errors.subCategory && <p className="mt-2 text-sm text-red-400">{errors.subCategory.message}</p>}
                   {watch("topCategory") && subCategories.length === 0 && (
@@ -1408,7 +2005,7 @@ export default function ProductPage() {
                   />
                 </div>
               </div>
-              {/* Replace the image upload UI section in the form with this updated version */}
+              {/* Image upload section */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Images</label>
                 <div className="flex items-center space-x-4">
@@ -1609,6 +2206,29 @@ export default function ProductPage() {
           </div>
         </div>
       )}
+
+      {/* Category Creation Modals */}
+      <CategoryCreateModal
+        isOpen={showCategoryCreateModal}
+        onClose={() => setShowCategoryCreateModal(false)}
+        onSuccess={handleCategoryCreateSuccess}
+      />
+
+      <TopCategoryCreateModal
+        isOpen={showTopCategoryCreateModal}
+        onClose={() => setShowTopCategoryCreateModal(false)}
+        onSuccess={handleTopCategoryCreateSuccess}
+        categories={categories}
+        selectedCategoryId={createModalCategoryId}
+      />
+
+      <SubCategoryCreateModal
+        isOpen={showSubCategoryCreateModal}
+        onClose={() => setShowSubCategoryCreateModal(false)}
+        onSuccess={handleSubCategoryCreateSuccess}
+        topCategories={allTopCategories}
+        selectedTopCategoryId={createModalTopCategoryId}
+      />
     </div>
   )
 }
