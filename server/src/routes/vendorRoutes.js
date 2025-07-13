@@ -4,7 +4,8 @@ import {
     getVendors,
     getVendor,
     updateVendor,
-    deleteVendor
+    deleteVendor,
+    loginVendor
 } from "../controllers/vendorController.js";
 
 const router = express.Router();
@@ -14,5 +15,6 @@ router.get("/", getVendors);
 router.get("/:id", getVendor);
 router.put("/:id", updateVendor);
 router.delete("/:id", deleteVendor);
+router.post("/login", loginVendor);
 
 export default router;

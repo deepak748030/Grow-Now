@@ -83,3 +83,36 @@ export const deleteVendor = async (req, res) => {
         res.status(400).json({ success: false, error: "Delete failed" });
     }
 };
+
+// ✅ Vendor Login
+export const loginVendor = async (req, res) => {
+    try {
+        const { username, password } = req.body;
+
+        if (!username || !password) {
+            return res.status(400).json({
+                success: false,
+                error: "Username and password are required",
+            });
+        }
+
+        const vendor = await Vendor.findOne({ username }).lean();
+
+        if (!vendor || vendor.password !== password) {
+            return res.status(401).json({ success: false, error: "Invalid credentials" });
+        }
+
+        res.json({
+            success: true,
+            message: "Login successful",
+            data: {
+                id: vendor._id,
+                name: vendor.name,
+                brandName: vendor.brandName,
+                username: vendor.username,
+            },
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: "Login failed" });
+    }
+};
