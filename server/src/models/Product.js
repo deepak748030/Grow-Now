@@ -75,6 +75,18 @@ const ProductSchema = new mongoose.Schema(
             type: [ProductVariantsSchema],
             default: [],
         },
+        // ✅ New: Status field
+        status: {
+            type: String,
+            enum: ["pending", "success", "failed"],
+            default: "pending",
+        },
+
+        // ✅ New: Creator ID field
+        creatorId: {
+            type: mongoose.Schema.Types.ObjectId,
+            default: null,
+        },
     },
     {
         timestamps: true,
