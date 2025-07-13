@@ -42,7 +42,7 @@ import AttendanceRouter from "../routes/AttandanceRouter.js"; // Attendance Rout
 import BoxRoutes from '../routes/boxRoutes.js'
 import topCategoryRoutes from "../routes/topCategoryRoutes.js";
 import subCategoryRoutes from "../routes/subCategoryRoutes.js";
-
+import vendorRoutes from "../routes/vendorRoutes.js";
 
 
 import upload from "../middleware/multer.js";
@@ -75,7 +75,6 @@ app.use(
 
 // ✅ Routes
 app.use("/users", userRoutes);
-app.use("/categories", categoryRoutes);
 app.use("/orders", orderRoutes);
 app.use("/subscriptions", subscriptionRoutes);
 app.use("/transaction", transactionRoutes);
@@ -102,8 +101,10 @@ app.use("/unavailable-locations", unavailableLocationRoutes); // Unavailable Loc
 app.use("/workers", workersRoute); // Worker Route
 app.use("/attendance", AttendanceRouter); // Attendance Routes
 app.use("/box", BoxRoutes); // Box Routes
+app.use("/categories", categoryRoutes);
 app.use("/top-categories", topCategoryRoutes);
 app.use("/sub-categories", subCategoryRoutes);
+app.use("/vendors", vendorRoutes);
 
 // ✅ Default Route
 app.get("/", (req, res) => {
