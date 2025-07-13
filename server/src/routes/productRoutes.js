@@ -4,7 +4,8 @@ import {
     getAllProducts,
     getProductById,
     updateProduct,
-    deleteProduct
+    deleteProduct,
+    getProductsByCreator
 } from '../controllers/productController.js';
 import upload from '../middleware/multer.js';
 
@@ -20,4 +21,5 @@ router.route('/:id')
     .patch(upload.array('images', 10), updateProduct) // Allow up to 10 images
     .delete(deleteProduct);
 
+router.get("/creator/:creatorId", getProductsByCreator); // ✅ New route
 export default router;

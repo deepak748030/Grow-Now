@@ -200,3 +200,23 @@ export const deleteProduct = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+export const getProductsByCreator = async (req, res) => {
+    try {
+        const { creatorId } = req.params;
+
+        if (!creatorId) {
+            return res.status(400).json({ success: false, error: "creatorId is required" });
+        }
+
+        const products = await Product.find({ creatorId }).sort({ createdAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            count: products.length,
+            data: products,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
