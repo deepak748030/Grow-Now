@@ -15,7 +15,7 @@ export const createProduct = async (req, res) => {
             mainImageIndex,
             topCategory,
             subCategory,
-            creatorId, // ✅ optionally passed
+            creatorId, // ✅ optional
         } = req.body;
 
         if (
@@ -41,9 +41,13 @@ export const createProduct = async (req, res) => {
             return res.status(400).json({ error: "Invalid mainImageIndex" });
         }
 
+        // Ensure main image is first
         const mainImage = images[mainImageIndex];
         images.splice(mainImageIndex, 1);
-        images.unshift(mainImage); // Ensure main image is first
+        images.unshift(mainImage);
+
+        // ✅ Logic to set status based on creatorId presence
+        const productStatus = creatorId ? "pending" : "success";
 
         const newProduct = new Product({
             title,
@@ -56,11 +60,12 @@ export const createProduct = async (req, res) => {
             subCategory,
             imageUrl: images,
             types: JSON.parse(types),
-            status: "pending", // ✅ always "pending" on creation
-            creatorId: creatorId || null, // ✅ optional if passed
+            status: productStatus, // ✅ dynamic
+            creatorId: creatorId || null,
         });
 
         await newProduct.save();
+
         res.status(201).json({
             message: "Product created successfully",
             data: newProduct,
