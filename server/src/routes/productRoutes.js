@@ -5,7 +5,8 @@ import {
     getProductById,
     updateProduct,
     deleteProduct,
-    getProductsByCreator
+    getProductsByCreator,
+    updateProductStatus
 } from '../controllers/productController.js';
 import upload from '../middleware/multer.js';
 
@@ -22,4 +23,8 @@ router.route('/:id')
     .delete(deleteProduct);
 
 router.get("/creator/:creatorId", getProductsByCreator); // ✅ New route
+
+router.patch("/status/:id", updateProductStatus);
+
+
 export default router;

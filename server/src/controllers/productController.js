@@ -225,3 +225,58 @@ export const getProductsByCreator = async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 };
+
+
+export const updateProductStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        // Validate status field exists
+        if (!status) {
+            return res.status(400).json({
+                success: false,
+                error: "Status field is required in body (e.g. 'pending', 'success', 'failed')",
+            });
+        }
+
+        // ✅ Allowable statuses
+        const allowedStatuses = ["pending", "success", "failed"];
+        if (!allowedStatuses.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                error: `Invalid status. Allowed values are: ${allowedStatuses.join(", ")}`,
+            });
+        }
+
+        // ✅ Try to update product
+        const updatedProduct = await Product.findByIdAndUpdate(
+            id,
+            { status },
+            { new: true, runValidators: true }
+        );
+
+        // ❌ Not found
+        if (!updatedProduct) {
+            return res.status(404).json({
+                success: false,
+                error: "Product not found with the given ID",
+            });
+        }
+
+        // ✅ Success
+        return res.status(200).json({
+            success: true,
+            message: `Product status updated to '${status}'`,
+            data: updatedProduct,
+        });
+
+    } catch (error) {
+        // ❌ Internal Server Error
+        return res.status(500).json({
+            success: false,
+            error: "Internal server error",
+            details: error.message,
+        });
+    }
+};
