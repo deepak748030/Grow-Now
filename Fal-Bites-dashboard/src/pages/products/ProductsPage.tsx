@@ -1958,7 +1958,6 @@ export default function ProductPage() {
                     }
                     onCreateNew={handleCreateSubCategory}
                     selectedTopCategoryId={watch("topCategory")}
-                    topCategories={allTopCategories}
                   />
                   {errors.subCategory && <p className="mt-2 text-sm text-red-400">{errors.subCategory.message}</p>}
                   {watch("topCategory") && subCategories.length === 0 && (

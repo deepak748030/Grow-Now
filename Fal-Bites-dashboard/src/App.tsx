@@ -29,6 +29,8 @@ import ReviewsManagementPage from './pages/reviews/ReviewsManagementPage';
 import BoxManagementPage from './pages/box/BoxInfoPage';
 import TopCategoriesPage from './pages/categories/TopCategoriesPage';
 import SubCategoriesPage from './pages/categories/SubCategoriesPage';
+import ProductStatusManagementPage from './pages/product-status/productStatus';
+import VendorManagementPage from './pages/vendor/vendorManagement';
 // Theme wrapper component
 function ThemeWrapper({ children }: { children: React.ReactNode }) {
   const isDarkMode = useSelector((state: RootState) => state.theme.isDarkMode);
@@ -79,6 +81,8 @@ function App() {
               <Route path="delivery-partner-verification" element={<DeliveryPartnerVerificationPage />} />
               <Route path="reviews" element={<ReviewsManagementPage />} />
               <Route path="box-info" element={<BoxManagementPage />} />
+              <Route path="product-status" element={<ProductStatusManagementPage />} />
+              <Route path="vendors" element={<VendorManagementPage />} />
             </Route>
 
 

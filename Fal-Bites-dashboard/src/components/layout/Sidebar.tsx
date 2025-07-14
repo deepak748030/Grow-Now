@@ -4,29 +4,22 @@ import {
   LayoutDashboard,
   Package,
   Settings,
-  // Tags,
   Truck,
   Users,
+  Layers,
+  FolderTree,
   Building2,
   Menu,
   ShoppingCart,
   X,
   ChevronLeft,
-  // CreditCard,
-  // Lightbulb,
-  // Trophy,
-  ListTree,
-  // ClipboardList,
-  // CheckCircle,
-  // MapPinOff,
-  Briefcase,
-  // HandCoins,
-  ShieldCheck,
-  Layers,
-  FolderTree,
-  // Star,
-  // Box
+  Store,
+  UserCog,
+  UserCheck,
+  Boxes,
+  Tag,
 } from 'lucide-react';
+
 const menuItems = [
   {
     path: '/',
@@ -41,28 +34,23 @@ const menuItems = [
   },
   {
     path: '/manager-management',
-    icon: Briefcase,
+    icon: UserCog,
     label: 'Manager Management',
   },
 
   // Delivery & Logistics
   {
     path: '/delivery-partner',
-    icon: Truck, // Lucide icon suitable for delivery or logistics
+    icon: Truck,
     label: 'Delivery Partner'
   },
   {
     path: '/delivery-partner-verification',
-    icon: ShieldCheck, // symbolizes verification, approval, trust
+    icon: UserCheck,
     label: 'Partner Verification',
   },
-  // {
-  //   path: '/deliver-attendance',
-  //   icon: CheckCircle,
-  //   label: 'Deliver Attendance'
-  // },
 
-  // Products & Subscriptions
+  // Products & Orders
   {
     path: '/products',
     icon: Package,
@@ -73,49 +61,30 @@ const menuItems = [
     icon: ShoppingCart,
     label: 'Product Orders'
   },
-  // {
-  //   path: '/subscriptions',
-  //   icon: CreditCard,
-  //   label: 'Subscriptions'
-  // },
-  // {
-  //   path: '/subscription-order',
-  //   icon: ClipboardList,
-  //   label: 'Subscription Order'
-  // },
 
-  // User Engagement & Content
-  // {
-  //   path: '/daily-tips',
-  //   icon: Lightbulb,
-  //   label: 'Daily Tips'
-  // },
-  // {
-  //   path: '/reviews',
-  //   icon: Star, // Lucide icon suitable for reviews or ratings
-  //   label: 'Reviews'
-  // },
+  // Categories
   {
     path: '/categories',
-    icon: ListTree,
-    label: 'categories'
+    icon: Tag,
+    label: 'Categories'
   },
   {
     path: '/top-categories',
-    icon: Layers, // ✅ Example icon for Top Categories
+    icon: Layers,
     label: 'Top Categories'
   },
   {
     path: '/sub-categories',
     icon: FolderTree,
     label: 'Sub Categories'
-  }
-  ,
-  // {
-  //   path: '/goals',
-  //   icon: Trophy,
-  //   label: 'Goals'
-  // },
+  },
+
+  // Vendors
+  {
+    path: '/vendors',
+    icon: Store,
+    label: 'Vendors'
+  },
 
   // Admin & System
   {
@@ -123,21 +92,11 @@ const menuItems = [
     icon: Building2,
     label: 'Franchise'
   },
-  // {
-  //   path: '/unavailable-locations',
-  //   icon: MapPinOff,
-  //   label: 'Unavailable Locations',
-  // },
-  // {
-  //   path: '/payout',
-  //   icon: HandCoins,
-  //   label: 'Payout',
-  // },
-  // {
-  //   path: '/box-info',
-  //   icon: Box,
-  //   label: 'Box Info',
-  // },
+  {
+    path: '/product-status',
+    icon: Boxes,
+    label: 'Product Status',
+  },
   {
     path: '/settings',
     icon: Settings,
@@ -217,26 +176,28 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
 
         {/* Navigation */}
         <nav className="flex flex-col gap-1 p-4 overflow-y-auto h-[calc(100vh-4rem)]">
-          {menuItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              onClick={handleNavClick}
-              className={({ isActive }) => `
-                flex items-center gap-3 px-3 py-2 rounded-lg
-                transition-colors duration-200
-                ${isActive
-                  ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                }
-              `}
-            >
-              <item.icon className="w-5 h-5 flex-shrink-0" />
-              {!isCollapsed && (
-                <span className="text-sm font-medium">{item.label}</span>
-              )}
-            </NavLink>
-          ))}
+          {menuItems.map((item) =>
+            item ? (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={handleNavClick}
+                className={({ isActive }) => `
+                  flex items-center gap-3 px-3 py-2 rounded-lg
+                  transition-colors duration-200
+                  ${isActive
+                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  }
+                `}
+              >
+                <item.icon className="w-5 h-5 flex-shrink-0" />
+                {!isCollapsed && (
+                  <span className="text-sm font-medium">{item.label}</span>
+                )}
+              </NavLink>
+            ) : null
+          )}
         </nav>
       </aside>
     </>
