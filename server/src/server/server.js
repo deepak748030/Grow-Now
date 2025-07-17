@@ -43,6 +43,7 @@ import BoxRoutes from '../routes/boxRoutes.js'
 import topCategoryRoutes from "../routes/topCategoryRoutes.js";
 import subCategoryRoutes from "../routes/subCategoryRoutes.js";
 import vendorRoutes from "../routes/vendorRoutes.js";
+import bulkDeliveryRoutes from '../routes/bulkDeliveryRoutes.js';
 
 
 import upload from "../middleware/multer.js";
@@ -105,6 +106,9 @@ app.use("/categories", categoryRoutes);
 app.use("/top-categories", topCategoryRoutes);
 app.use("/sub-categories", subCategoryRoutes);
 app.use("/vendors", vendorRoutes);
+
+app.use('/api/bulk-delivery', bulkDeliveryRoutes);
+
 
 // ✅ Default Route
 app.get("/", (req, res) => {
