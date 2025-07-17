@@ -61,7 +61,11 @@ const menuItems = [
     icon: ShoppingCart,
     label: 'Product Orders'
   },
-
+  {
+    path: '/bulk-orders',
+    icon: Truck,
+    label: 'Bulk Orders'
+  },
   // Categories
   {
     path: '/categories',
