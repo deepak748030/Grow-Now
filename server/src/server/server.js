@@ -106,8 +106,8 @@ app.use("/categories", categoryRoutes);
 app.use("/top-categories", topCategoryRoutes);
 app.use("/sub-categories", subCategoryRoutes);
 app.use("/vendors", vendorRoutes);
-
 app.use('/api/bulk-delivery', bulkDeliveryRoutes);
+
 
 
 // ✅ Default Route

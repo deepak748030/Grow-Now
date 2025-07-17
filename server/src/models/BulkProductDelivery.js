@@ -16,7 +16,7 @@ const BulkDeliverySchema = new mongoose.Schema(
             required: [true, "Phone number is required"],
         },
         deliveryDate: {
-            type: Date,
+            type: String,
             required: [true, "Delivery date is required"],
         },
         imageUrl: {
