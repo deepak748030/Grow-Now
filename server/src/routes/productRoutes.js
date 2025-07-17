@@ -1,4 +1,6 @@
+// routes/productRoutes.js
 import express from 'express';
+import upload from '../middleware/multer.js';
 import {
     createProduct,
     getAllProducts,
@@ -6,25 +8,28 @@ import {
     updateProduct,
     deleteProduct,
     getProductsByCreator,
-    updateProductStatus
+    updateProductStatus,
+    searchProducts,
 } from '../controllers/productController.js';
-import upload from '../middleware/multer.js';
 
 const router = express.Router();
 
-// Product Routes
+router.get('/search', searchProducts);
+// Create and Get All Products
 router.route('/')
-    .post(upload.array('images', 10), createProduct) // Allow up to 10 images
+    .post(upload.array('images', 10), createProduct)
     .get(getAllProducts);
 
+// Get, Update, Delete Product by ID
 router.route('/:id')
     .get(getProductById)
-    .patch(upload.array('images', 10), updateProduct) // Allow up to 10 images
+    .patch(upload.array('images', 10), updateProduct)
     .delete(deleteProduct);
 
-router.get("/creator/:creatorId", getProductsByCreator); // ✅ New route
+// Get Products by Creator
+router.get('/creator/:creatorId', getProductsByCreator);
 
-router.patch("/status/:id", updateProductStatus);
-
+// Update Product Status
+router.patch('/status/:id', updateProductStatus);
 
 export default router;

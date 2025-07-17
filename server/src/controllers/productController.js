@@ -1,6 +1,5 @@
 import Product from '../models/Product.js';
 import { SERVER_IMAGE_URL } from '../services/config.js';
-// import redis from '../redis/redisClient.js'
 
 export const createProduct = async (req, res) => {
     try {
@@ -8,105 +7,54 @@ export const createProduct = async (req, res) => {
             title,
             description,
             category,
-            stock,
-            weightOrCount,
-            tag,
-            types,
-            mainImageIndex,
             topCategory,
             subCategory,
-            creatorId, // ✅ optional
+            tag,
+            types,
+            brand,
+            creatorId,
         } = req.body;
 
         if (
-            !title ||
-            !description ||
-            !category ||
-            !weightOrCount ||
-            !types ||
-            !req.files ||
-            mainImageIndex === undefined
+            !title || !description || !topCategory || !subCategory ||
+            !types || !req.files
         ) {
-            return res.status(400).json({ error: "All fields are required" });
+            return res.status(400).json({ success: false, error: "All required fields are missing or invalid" });
         }
 
-        const images = req.files.map((file) => {
-            if (!file || !file.filename) {
-                throw new Error("Invalid file upload");
-            }
-            return `${SERVER_IMAGE_URL}/uploads/${file.filename}`;
-        });
+        // Parse types and assign images
+        const parsedTypes = JSON.parse(types);
+        const images = req.files.map(file => `${SERVER_IMAGE_URL}/uploads/${file.filename}`);
 
-        if (mainImageIndex < 0 || mainImageIndex >= images.length) {
-            return res.status(400).json({ error: "Invalid mainImageIndex" });
-        }
+        // Assign images to variants
+        const typesWithImages = parsedTypes.map((type, index) => ({
+            ...type,
+            imageUrl: images[index] || '' // Assign image to each variant
+        }));
 
-        // Ensure main image is first
-        const mainImage = images[mainImageIndex];
-        images.splice(mainImageIndex, 1);
-        images.unshift(mainImage);
-
-        // ✅ Logic to set status based on creatorId presence
-        const productStatus = creatorId ? "pending" : "success";
+        const productStatus = creatorId ? 'pending' : 'success';
 
         const newProduct = new Product({
             title,
             description,
-            category,
-            stock,
-            weightOrCount,
-            tag,
+            category: category || null,
             topCategory,
             subCategory,
-            imageUrl: images,
-            types: JSON.parse(types),
-            status: productStatus, // ✅ dynamic
+            brand: brand || null,
+            tag: tag ? JSON.parse(tag) : [],
+            types: typesWithImages,
+            status: productStatus,
             creatorId: creatorId || null,
         });
 
         await newProduct.save();
+        res.status(201).json({ success: true, message: "Product created successfully", data: newProduct });
 
-        res.status(201).json({
-            message: "Product created successfully",
-            data: newProduct,
-        });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.log(error);
+        res.status(500).json({ success: false, error: error.message });
     }
 };
-
-
-// ✅ Get All Products
-export const getAllProducts = async (_req, res) => {
-    try {
-        // const cacheProducts = await redis.get('products');
-        // if (cacheProducts) {
-        //     console.log("first");
-        //     return res.status(200).json({ success: true, data: JSON.parse(cacheProducts) });
-        // }
-        const products = await Product.find().sort({ createdAt: -1 })
-            .populate('category')
-            .select('-createdAt -updatedAt');
-        // await redis.set('products', JSON.stringify(products), 'EX', 3600); // Cache for 1 hour
-        res.status(200).json({ success: true, data: products });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-};
-
-// ✅ Get Product by ID
-export const getProductById = async (req, res) => {
-    try {
-
-        const product = await Product.findById(req.params.id);
-        if (!product) return res.status(404).json({ error: 'Product not found' });
-        res.status(200).json({ success: true, data: product });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-        console.log(error)
-    }
-};
-
 
 export const updateProduct = async (req, res) => {
     try {
@@ -114,169 +62,165 @@ export const updateProduct = async (req, res) => {
             title,
             description,
             category,
-            stock,
-            weightOrCount,
-            tag,
-            types,
-            mainImageIndex,
             topCategory,
             subCategory,
+            brand,
+            tag,
+            types,
         } = req.body;
 
-        // ✅ Validate required fields
-        if (!title || !description || !category || !weightOrCount || mainImageIndex === undefined) {
-            return res.status(400).json({
-                success: false,
-                error: "All required fields must be provided",
-            });
+        if (!title || !description || !topCategory || !subCategory) {
+            return res.status(400).json({ success: false, error: "Missing required fields" });
         }
 
-        // ✅ Build the update payload
         const updateData = {
             title,
             description,
-            category,
-            stock,
-            weightOrCount,
-            tag,
+            category: category || null,
             topCategory,
             subCategory,
+            brand: brand || null,
+            tag: tag ? JSON.parse(tag) : [],
         };
 
-        // ✅ Handle image update
-        if (req.files && req.files.length > 0) {
-            const images = req.files.map((file) => {
-                if (!file || !file.filename) {
-                    throw new Error("Invalid file upload");
-                }
-                return `${SERVER_IMAGE_URL}/uploads/${file.filename}`;
-            });
-
-            if (mainImageIndex < 0 || mainImageIndex >= images.length) {
-                return res.status(400).json({ success: false, error: "Invalid mainImageIndex" });
-            }
-
-            // Ensure main image is first
-            const mainImage = images[mainImageIndex];
-            images.splice(mainImageIndex, 1);
-            images.unshift(mainImage);
-
-            updateData.imageUrl = images;
-        }
-
-        // ✅ Handle types update
         if (types) {
             try {
-                updateData.types = JSON.parse(types);
+                const parsedTypes = JSON.parse(types);
+
+                if (req.files && req.files.length > 0) {
+                    // New images uploaded
+                    const images = req.files.map(file => `${SERVER_IMAGE_URL}/uploads/${file.filename}`);
+                    updateData.types = parsedTypes.map((type, index) => ({
+                        ...type,
+                        imageUrl: images[index] || type.imageUrl || ''
+                    }));
+                } else {
+                    // No new images, keep existing
+                    updateData.types = parsedTypes;
+                }
             } catch (e) {
-                return res.status(400).json({ success: false, error: "Invalid types JSON format" });
+                return res.status(400).json({ success: false, error: "Invalid types JSON" });
             }
         }
 
-        // ✅ Update the product
-        const updatedProduct = await Product.findByIdAndUpdate(req.params.id, updateData, {
-            new: true,
-            runValidators: true,
-        });
+        const updatedProduct = await Product.findByIdAndUpdate(
+            req.params.id,
+            updateData,
+            { new: true, runValidators: true }
+        );
 
-        if (!updatedProduct) {
-            return res.status(404).json({ success: false, error: "Product not found" });
+        if (!updatedProduct) return res.status(404).json({ success: false, error: 'Product not found' });
+
+        res.status(200).json({ success: true, message: "Product updated successfully", data: updatedProduct });
+
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+// Add search endpoint
+export const searchProducts = async (req, res) => {
+    try {
+        const { q, category } = req.query;
+        let filter = {};
+
+        if (q) {
+            filter.$or = [
+                { title: { $regex: q, $options: 'i' } },
+                { description: { $regex: q, $options: 'i' } }
+            ];
         }
 
-        res.status(200).json({
-            success: true,
-            message: "Product updated successfully",
-            data: updatedProduct,
-        });
+        if (category && category !== '') {
+            filter.category = category;
+        }
+
+        const products = await Product.find(filter).sort({ createdAt: -1 })
+            .populate('category topCategory subCategory brand')
+            .select('-__v');
+
+        res.status(200).json({ success: true, data: products });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+export const getAllProducts = async (_req, res) => {
+    try {
+        const products = await Product.find().sort({ createdAt: -1 })
+            .populate('category topCategory subCategory brand')
+            .select('-__v');
+        res.status(200).json({ success: true, data: products });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+export const getProductById = async (req, res) => {
+    try {
+        const product = await Product.findById(req.params.id)
+            .populate('category topCategory subCategory brand');
+        if (!product) return res.status(404).json({ success: false, error: 'Product not found' });
+
+        res.status(200).json({ success: true, data: product });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
 };
 
 
-// ✅ Delete Product
 export const deleteProduct = async (req, res) => {
     try {
-        const deletedProduct = await Product.findByIdAndDelete(req.params.id);
-        if (!deletedProduct) return res.status(404).json({ error: 'Product not found' });
-        // await redis.del('products'); // Invalidate the cache for products
-        res.status(200).json({ message: 'Product deleted successfully' });
+        const deleted = await Product.findByIdAndDelete(req.params.id);
+        if (!deleted) return res.status(404).json({ success: false, error: "Product not found" });
+
+        res.status(200).json({ success: true, message: "Product deleted successfully" });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ success: false, error: error.message });
     }
 };
 
 export const getProductsByCreator = async (req, res) => {
     try {
         const { creatorId } = req.params;
-
-        if (!creatorId) {
-            return res.status(400).json({ success: false, error: "creatorId is required" });
-        }
+        if (!creatorId) return res.status(400).json({ success: false, error: "creatorId is required" });
 
         const products = await Product.find({ creatorId }).sort({ createdAt: -1 });
+        res.status(200).json({ success: true, count: products.length, data: products });
 
-        res.status(200).json({
-            success: true,
-            count: products.length,
-            data: products,
-        });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
 };
-
 
 export const updateProductStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
 
-        // Validate status field exists
-        if (!status) {
-            return res.status(400).json({
-                success: false,
-                error: "Status field is required in body (e.g. 'pending', 'success', 'failed')",
-            });
-        }
-
-        // ✅ Allowable statuses
         const allowedStatuses = ["pending", "success", "failed"];
-        if (!allowedStatuses.includes(status)) {
+        if (!status || !allowedStatuses.includes(status)) {
             return res.status(400).json({
                 success: false,
-                error: `Invalid status. Allowed values are: ${allowedStatuses.join(", ")}`,
+                error: `Invalid status. Allowed values: ${allowedStatuses.join(", ")}`,
             });
         }
 
-        // ✅ Try to update product
-        const updatedProduct = await Product.findByIdAndUpdate(
+        const updated = await Product.findByIdAndUpdate(
             id,
             { status },
             { new: true, runValidators: true }
         );
 
-        // ❌ Not found
-        if (!updatedProduct) {
-            return res.status(404).json({
-                success: false,
-                error: "Product not found with the given ID",
-            });
-        }
+        if (!updated) return res.status(404).json({ success: false, error: "Product not found" });
 
-        // ✅ Success
-        return res.status(200).json({
+        res.status(200).json({
             success: true,
-            message: `Product status updated to '${status}'`,
-            data: updatedProduct,
+            message: `Status updated to '${status}'`,
+            data: updated,
         });
 
     } catch (error) {
-        // ❌ Internal Server Error
-        return res.status(500).json({
-            success: false,
-            error: "Internal server error",
-            details: error.message,
-        });
+        res.status(500).json({ success: false, error: error.message });
     }
 };

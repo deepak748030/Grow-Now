@@ -2,9 +2,9 @@ import mongoose from "mongoose";
 
 // Define the ProductVariants schema
 const ProductVariantsSchema = new mongoose.Schema({
-    title: {
+    weightCountOrAny: {
         type: String,
-        required: [true, "Variant title is required"],
+        required: [true, "Weight/Count/Variant title is required"],
         trim: true,
         index: true,
     },
@@ -14,16 +14,25 @@ const ProductVariantsSchema = new mongoose.Schema({
         min: [0, "Price must be a positive number"],
         index: true,
     },
-    withoutDiscountPrice: {
+    mrp: {
         type: Number,
-        required: [true, "Without discount price is required"],
-        min: [0, "Without discount price must be a positive number"],
+        required: [true, "MRP is required"],
+        min: [0, "MRP must be a positive number"],
         index: true,
     },
-    smallDescription: {
+    tag: {
         type: String,
-        required: [true, "Small description is required"],
-        maxlength: [200, "Small description cannot exceed 200 characters"],
+        required: [true, "Tag is required"],
+        maxlength: [200, "Tag cannot exceed 200 characters"],
+    },
+    imageUrl: {
+        type: String,
+        // required: [true, "Variant image is required"],
+    },
+    stock: {
+        type: Number,
+        required: true,
+        min: [0, "Stock cannot be negative"],
     },
 });
 
@@ -53,21 +62,12 @@ const ProductSchema = new mongoose.Schema(
             ref: "SubCategory",
             required: [true, "Sub Category reference is required"],
         },
-        stock: {
-            type: Number,
-            default: 0,
-            min: [0, "Stock cannot be negative"],
-            index: true,
-        },
-        weightOrCount: {
+        brand: {
             type: String,
-            required: [true, "Weight or count is required"],
+            // ref: "Brand",
+            default: null,
         },
         tag: {
-            type: [String],
-            default: []
-        },
-        imageUrl: {
             type: [String],
             default: []
         },
@@ -75,14 +75,11 @@ const ProductSchema = new mongoose.Schema(
             type: [ProductVariantsSchema],
             default: [],
         },
-        // ✅ New: Status field
         status: {
             type: String,
             enum: ["pending", "success", "failed"],
             default: "pending",
         },
-
-        // ✅ New: Creator ID field
         creatorId: {
             type: mongoose.Schema.Types.ObjectId,
             default: null,
