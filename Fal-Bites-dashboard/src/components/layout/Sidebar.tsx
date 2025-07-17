@@ -82,8 +82,14 @@ const menuItems = [
     icon: FolderTree,
     label: 'Sub Categories'
   },
+  {
+    path: '/brands',
+    icon: Tag, // You can use another icon if preferred
+    label: 'Brands'
+  },
 
   // Vendors
+
   {
     path: '/vendors',
     icon: Store,

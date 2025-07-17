@@ -32,6 +32,7 @@ import SubCategoriesPage from './pages/categories/SubCategoriesPage';
 import ProductStatusManagementPage from './pages/product-status/productStatus';
 import VendorManagementPage from './pages/vendor/vendorManagement';
 import BulkOrdersPage from './pages/bulkorders/BulkOrdersPage';
+import BrandPage from './pages/brand/BrandPage';
 // Theme wrapper component
 function ThemeWrapper({ children }: { children: React.ReactNode }) {
   const isDarkMode = useSelector((state: RootState) => state.theme.isDarkMode);
@@ -85,6 +86,7 @@ function App() {
               <Route path="product-status" element={<ProductStatusManagementPage />} />
               <Route path="vendors" element={<VendorManagementPage />} />
               <Route path="bulk-orders" element={<BulkOrdersPage />} />
+              <Route path="brands" element={<BrandPage />} />
             </Route>
 
 
