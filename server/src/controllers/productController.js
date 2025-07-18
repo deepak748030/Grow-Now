@@ -29,12 +29,12 @@ export const createProduct = async (req, res) => {
         // Assign images to variants
         const typesWithImages = parsedTypes.map((type, index) => ({
             ...type,
-            imageUrl: images[index] || '' // Assign image to each variant
+            imageUrl: images[index] || ''
         }));
 
         const productStatus = creatorId ? 'pending' : 'success';
 
-        const newProduct = new Product({
+        const newProductData = {
             title,
             description,
             category: category || null,
@@ -44,17 +44,50 @@ export const createProduct = async (req, res) => {
             tag: tag ? JSON.parse(tag) : [],
             types: typesWithImages,
             status: productStatus,
-            creatorId: creatorId || null,
-        });
+        };
 
+        // Conditionally add creatorId if present
+        if (creatorId) {
+            newProductData.creatorId = creatorId;
+        }
+
+        const newProduct = new Product(newProductData);
         await newProduct.save();
-        res.status(201).json({ success: true, message: "Product created successfully", data: newProduct });
+
+        res.status(201).json({
+            success: true,
+            message: "Product created successfully",
+            data: newProduct
+        });
 
     } catch (error) {
         console.log(error);
         res.status(500).json({ success: false, error: error.message });
     }
 };
+
+
+// Get all products created by a specific creator
+export const getProductsByCreatorId = async (req, res) => {
+    try {
+        const { creatorId } = req.params;
+
+        if (!creatorId) {
+            return res.status(400).json({ success: false, message: "Creator ID is required" });
+        }
+
+        const products = await Product.find({ creatorId });
+
+        res.status(200).json({
+            success: true,
+            data: products,
+        });
+    } catch (error) {
+        console.error("Error fetching products by creatorId:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 
 export const updateProduct = async (req, res) => {
     try {

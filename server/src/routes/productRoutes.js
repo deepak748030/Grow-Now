@@ -10,12 +10,15 @@ import {
     getProductsByCreator,
     updateProductStatus,
     searchProducts,
+    getProductsByCreatorId,
 } from '../controllers/productController.js';
 
 const router = express.Router();
 
 router.get('/search', searchProducts);
 // Create and Get All Products
+router.get('/creator/:creatorId', getProductsByCreatorId);
+
 router.route('/')
     .post(upload.array('images', 10), createProduct)
     .get(getAllProducts);

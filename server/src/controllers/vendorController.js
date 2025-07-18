@@ -106,7 +106,7 @@ export const loginVendor = async (req, res) => {
             success: true,
             message: "Login successful",
             data: {
-                id: vendor._id,
+                _id: vendor._id,
                 name: vendor.name,
                 brandName: vendor.brandName,
                 username: vendor.username,
