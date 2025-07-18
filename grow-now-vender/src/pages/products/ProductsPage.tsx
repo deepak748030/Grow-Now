@@ -166,23 +166,6 @@ const deleteProduct = async (id: string) => {
   }
 }
 
-const searchProducts = async (query: string, category?: string) => {
-  try {
-    const vendorData = getVendorData()
-    if (!vendorData) {
-      throw new Error("No vendor data found")
-    }
-
-    const response = await api.get<ApiResponse<Product>>("/products/search", {
-      params: { q: query, category, creatorId: vendorData._id },
-    })
-    return response.data.data || []
-  } catch (error) {
-    console.error("Failed to search products:", error)
-    return []
-  }
-}
-
 const getCategories = async () => {
   try {
     const response = await api.get<ApiResponse<Category>>("/categories")
@@ -282,6 +265,96 @@ const getBrandName = (brandId: string | null | undefined, brands: Brand[]): stri
   if (!brandId || brandId === "null") return "No brand"
   const brand = brands.find((b) => b._id === brandId)
   return brand ? brand.title : brandId
+}
+
+// Frontend Search Function
+const searchProductsFrontend = (
+  allProducts: Product[],
+  searchQuery: string,
+  selectedCategoryId: string,
+  categories: Category[],
+  brands: Brand[]
+): Product[] => {
+  if (!searchQuery && !selectedCategoryId) {
+    return allProducts
+  }
+
+  return allProducts.filter((product) => {
+    // Category filter
+    if (selectedCategoryId) {
+      const productCategoryId = typeof product.category === "object" && product.category
+        ? product.category._id
+        : product.category
+
+      if (productCategoryId !== selectedCategoryId) {
+        return false
+      }
+    }
+
+    // Search query filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase().trim()
+
+      // Search in product title
+      if (product.title.toLowerCase().includes(query)) {
+        return true
+      }
+
+      // Search in product description
+      if (product.description.toLowerCase().includes(query)) {
+        return true
+      }
+
+      // Search in product tags
+      if (product.tag && product.tag.some(tag => tag.toLowerCase().includes(query))) {
+        return true
+      }
+
+      // Search in category name
+      const categoryName = typeof product.category === "object" && product.category
+        ? product.category.title
+        : getCategoryName(product.category, categories)
+
+      if (categoryName.toLowerCase().includes(query)) {
+        return true
+      }
+
+      // Search in brand name
+      const brandName = typeof product.brand === "object" && product.brand
+        ? product.brand.title
+        : getBrandName(product.brand, brands)
+
+      if (brandName.toLowerCase().includes(query)) {
+        return true
+      }
+
+      // Search in product variants
+      if (product.types && product.types.some(type =>
+        type.weightCountOrAny.toLowerCase().includes(query) ||
+        type.tag.toLowerCase().includes(query)
+      )) {
+        return true
+      }
+
+      // Search in top category name
+      if (product.topCategory && typeof product.topCategory === "object") {
+        if (product.topCategory.title.toLowerCase().includes(query)) {
+          return true
+        }
+      }
+
+      // Search in sub category name
+      if (product.subCategory && typeof product.subCategory === "object") {
+        if (product.subCategory.title.toLowerCase().includes(query)) {
+          return true
+        }
+      }
+
+      return false
+    }
+
+    return true
+  })
 }
 
 // Zod Schemas
@@ -1539,7 +1612,8 @@ export default function ProductPage({ onLogout }: ProductPageProps) {
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [variantImages, setVariantImages] = useState<Array<{ file: File | null; preview: string }>>([])
-  const [products, setProducts] = useState<Product[]>([])
+  const [allProducts, setAllProducts] = useState<Product[]>([]) // Store all products
+  const [products, setProducts] = useState<Product[]>([]) // Store filtered products
   const [searchQuery, setSearchQuery] = useState("")
   const [categories, setCategories] = useState<Category[]>([])
   const [topCategories, setTopCategories] = useState<TopCategory[]>([])
@@ -1698,6 +1772,7 @@ export default function ProductPage({ onLogout }: ProductPageProps) {
           getBrands(),
         ])
 
+        setAllProducts(productsData)
         setProducts(productsData)
         setCategories(categoriesData)
         setAllTopCategories(topCategoriesData)
@@ -1717,21 +1792,21 @@ export default function ProductPage({ onLogout }: ProductPageProps) {
     }
   }, [vendorData])
 
-  // Handle search with debouncing
+  // Handle search with debouncing - Frontend filtering
   useEffect(() => {
-    const handleSearch = async () => {
-      if (!searchQuery && !selectedCategoryId) {
-        const data = await getProducts()
-        setProducts(data)
-        return
-      }
-
+    const handleSearch = () => {
       setIsSearching(true)
       try {
-        const data = await searchProducts(searchQuery, selectedCategoryId || undefined)
-        setProducts(data)
+        const filteredProducts = searchProductsFrontend(
+          allProducts,
+          searchQuery,
+          selectedCategoryId,
+          categories,
+          brands
+        )
+        setProducts(filteredProducts)
       } catch (error) {
-        console.error("Failed to search products:", error)
+        console.error("Failed to filter products:", error)
         setError("Search failed. Please try again.")
       } finally {
         setIsSearching(false)
@@ -1742,7 +1817,7 @@ export default function ProductPage({ onLogout }: ProductPageProps) {
       const debounceTimeout = setTimeout(handleSearch, 300)
       return () => clearTimeout(debounceTimeout)
     }
-  }, [searchQuery, selectedCategoryId, vendorData])
+  }, [searchQuery, selectedCategoryId, allProducts, categories, brands, vendorData])
 
   const resetFormCompletely = () => {
     reset({
@@ -1810,6 +1885,7 @@ export default function ProductPage({ onLogout }: ProductPageProps) {
       }
 
       const productsData = await getProducts()
+      setAllProducts(productsData)
       setProducts(productsData)
       resetFormCompletely()
       setShowForm(false)
@@ -1828,6 +1904,7 @@ export default function ProductPage({ onLogout }: ProductPageProps) {
       try {
         await deleteProduct(id)
         const data = await getProducts()
+        setAllProducts(data)
         setProducts(data)
       } catch (error) {
         console.error("Failed to delete product:", error)
