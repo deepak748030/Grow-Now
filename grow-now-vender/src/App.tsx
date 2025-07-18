@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Provider } from 'react-redux';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { store } from './store/store';
@@ -23,26 +23,55 @@ function ThemeWrapper({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AppContent() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const vendorData = localStorage.getItem('vendorData');
+    if (vendorData) {
+      setIsAuthenticated(true);
+    }
+    setIsLoading(false);
+  }, []);
+
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('vendorData');
+    setIsAuthenticated(false);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<DashboardLayout />}>
+          <Route index element={<ProductsPage onLogout={handleLogout} />} />
+        </Route>
+      </Routes>
+    </Router>
+  );
+}
+
 function App() {
-
-
-
-
   return (
     <Provider store={store}>
       <ThemeWrapper>
-        <Router>
-          <Routes>
-            <Route path="/vendor-auth" element={<LoginPage />} />
-            <Route path="/" element={<DashboardLayout />}>
-              <Route index element={<ProductsPage />} />  {/* Default page for "/" */}
-
-
-            </Route>
-
-
-          </Routes>
-        </Router>
+        <AppContent />
       </ThemeWrapper>
     </Provider>
   );

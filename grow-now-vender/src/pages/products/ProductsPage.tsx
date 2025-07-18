@@ -1,18 +1,20 @@
 "use client"
-import type React from "react"
-import { useState, useEffect, useRef, useCallback } from "react"
+// select a category
+import React, { useState, useEffect, useRef, useCallback } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import axios from "axios"
-import { Package, Plus, Pencil, Trash2, X, Menu, Loader2, IndianRupee, Search, FolderPlus, LogOut } from "lucide-react"
+import { Package, Plus, Pencil, Trash2, X, Menu, Loader2, IndianRupee, Search, FolderPlus, CheckCircle, Clock, XCircle, Building2, LogOut } from "lucide-react"
 
 // Types and Interfaces
-interface ProductType {
-  title: string
+interface ProductVariant {
+  weightCountOrAny: string
   price: number
-  withoutDiscountPrice: number
-  smallDescription: string
+  mrp: number
+  tag: string
+  imageUrl: string
+  stock: number
   _id?: string
 }
 
@@ -41,6 +43,14 @@ interface SubCategory {
   }
 }
 
+interface Brand {
+  _id: string
+  title: string
+  image: string
+  createdAt?: string
+  updatedAt?: string
+}
+
 interface Product {
   _id: string
   title: string
@@ -48,13 +58,11 @@ interface Product {
   category: string | Category | null
   topCategory?: string | TopCategory
   subCategory?: string | SubCategory
-  stock: number
-  weightOrCount: string
+  brand?: string | Brand | null
   tag: string[]
-  imageUrl: string[]
-  types: ProductType[]
-  creatorId: string
-  status: string // Added status field
+  types: ProductVariant[]
+  status: "pending" | "success" | "failed"
+  creatorId?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -65,7 +73,7 @@ interface ApiResponse<T> {
 }
 
 interface VendorData {
-  id: string
+  _id: string
   name: string
   username: string
   brandName: string
@@ -76,11 +84,22 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000",
 })
 
-// Existing API Functions
-// Modified getProducts to fetch by creatorId
-const getProducts = async (creatorId: string) => {
+// Get vendor data from localStorage
+const getVendorData = (): VendorData | null => {
+  const vendorData = localStorage.getItem("vendorData")
+  return vendorData ? JSON.parse(vendorData) : null
+}
+
+// API Functions - Modified to use creatorId
+const getProducts = async () => {
   try {
-    const response = await api.get<ApiResponse<Product>>(`/products/creator/${creatorId}`)
+    const vendorData = getVendorData()
+    console.log(vendorData)
+    if (!vendorData) {
+      throw new Error("No vendor data found")
+    }
+
+    const response = await api.get<ApiResponse<Product>>(`/products/creator/${vendorData._id}`)
     return response.data.data || []
   } catch (error) {
     console.error("Failed to fetch products:", error)
@@ -100,6 +119,14 @@ const getProductById = async (id: string) => {
 
 const createProduct = async (formData: FormData) => {
   try {
+    const vendorData = getVendorData()
+    if (!vendorData) {
+      throw new Error("No vendor data found")
+    }
+
+    // Add creatorId to formData
+    formData.append("creatorId", vendorData._id)
+
     const response = await api.post<ApiResponse<Product>>("/products", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     })
@@ -112,6 +139,14 @@ const createProduct = async (formData: FormData) => {
 
 const updateProduct = async (id: string, formData: FormData) => {
   try {
+    const vendorData = getVendorData()
+    if (!vendorData) {
+      throw new Error("No vendor data found")
+    }
+
+    // Add creatorId to formData
+    formData.append("creatorId", vendorData._id)
+
     const response = await api.patch<ApiResponse<Product>>(`/products/${id}`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     })
@@ -133,8 +168,13 @@ const deleteProduct = async (id: string) => {
 
 const searchProducts = async (query: string, category?: string) => {
   try {
+    const vendorData = getVendorData()
+    if (!vendorData) {
+      throw new Error("No vendor data found")
+    }
+
     const response = await api.get<ApiResponse<Product>>("/products/search", {
-      params: { q: query, category },
+      params: { q: query, category, creatorId: vendorData._id },
     })
     return response.data.data || []
   } catch (error) {
@@ -173,7 +213,17 @@ const getSubCategories = async () => {
   }
 }
 
-// New API Functions for Creating Categories
+const getBrands = async () => {
+  try {
+    const response = await api.get<ApiResponse<Brand>>("/brand")
+    return response.data.data || []
+  } catch (error) {
+    console.error("Failed to fetch brands:", error)
+    return []
+  }
+}
+
+// API Functions for Creating Categories and Brands
 const createCategory = async (formData: FormData) => {
   try {
     const response = await api.post("/categories", formData, {
@@ -210,17 +260,16 @@ const createSubCategory = async (formData: FormData) => {
   }
 }
 
-// Helper functions
-const getTopCategoryName = (topCategoryId: string | undefined, topCategories: TopCategory[]): string => {
-  if (!topCategoryId) return "No top category"
-  const topCategory = topCategories.find((cat) => cat._id === topCategoryId)
-  return topCategory ? topCategory.title : topCategoryId
-}
-
-const getSubCategoryName = (subCategoryId: string | undefined, subCategories: SubCategory[]): string => {
-  if (!subCategoryId) return "No sub category"
-  const subCategory = subCategories.find((cat) => cat._id === subCategoryId)
-  return subCategory ? subCategory.title : subCategoryId
+const createBrand = async (formData: FormData) => {
+  try {
+    const response = await api.post("/brand", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+    return response.data.data
+  } catch (error) {
+    console.error("Failed to create brand:", error)
+    throw error
+  }
 }
 
 const getCategoryName = (categoryId: string | null | undefined, categories: Category[]): string => {
@@ -229,27 +278,33 @@ const getCategoryName = (categoryId: string | null | undefined, categories: Cate
   return category ? category.title : categoryId
 }
 
+const getBrandName = (brandId: string | null | undefined, brands: Brand[]): string => {
+  if (!brandId || brandId === "null") return "No brand"
+  const brand = brands.find((b) => b._id === brandId)
+  return brand ? brand.title : brandId
+}
+
 // Zod Schemas
-const productTypeSchema = z.object({
-  title: z.string().min(1, "Title is required"),
+const productVariantSchema = z.object({
+  weightCountOrAny: z.string().min(1, "Weight/Count is required"),
   price: z.number().min(0, "Price must be a positive number"),
-  withoutDiscountPrice: z.number().min(0, "Without discount price must be a positive number"),
-  smallDescription: z.string().max(200, "Small description cannot exceed 200 characters"),
+  mrp: z.number().min(0, "MRP must be a positive number"),
+  tag: z.string().min(1, "Tag is required").max(200, "Tag cannot exceed 200 characters"),
+  stock: z.number().min(0, "Stock must be a positive number"),
 })
 
 const productSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
   category: z.string().optional(),
-  topCategory: z.string().optional(),
-  subCategory: z.string().optional(),
-  stock: z.number().min(0, "Stock must be a positive number"),
-  weightOrCount: z.string().min(1, "Weight or count is required"),
+  topCategory: z.string().min(1, "Top Category is required"),
+  subCategory: z.string().min(1, "Sub Category is required"),
+  brand: z.string().optional(),
   tag: z
     .string()
     .optional()
     .transform((val) => (val ? [val] : [])),
-  types: z.array(productTypeSchema).min(1, "At least one product type is required"),
+  types: z.array(productVariantSchema).min(1, "At least one product variant is required"),
 })
 
 const categorySchema = z.object({
@@ -266,10 +321,15 @@ const subCategorySchema = z.object({
   topCategory: z.string().min(1, "Top Category is required"),
 })
 
+const brandSchema = z.object({
+  title: z.string().min(1, "Brand title is required").max(100, "Brand title cannot exceed 100 characters"),
+})
+
 type ProductFormData = z.infer<typeof productSchema>
 type CategoryFormData = z.infer<typeof categorySchema>
 type TopCategoryFormData = z.infer<typeof topCategorySchema>
 type SubCategoryFormData = z.infer<typeof subCategorySchema>
+type BrandFormData = z.infer<typeof brandSchema>
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
@@ -285,6 +345,190 @@ const EmptyState = ({ message }: { message: string }) => (
     <p className="text-lg">{message}</p>
   </div>
 )
+
+// Status Badge Component
+const StatusBadge = ({ status }: { status: "pending" | "success" | "failed" }) => {
+  const statusConfig = {
+    pending: { label: "Pending", color: "bg-yellow-100 text-yellow-800", icon: Clock },
+    success: { label: "Approved", color: "bg-green-100 text-green-800", icon: CheckCircle },
+    failed: { label: "Rejected", color: "bg-red-100 text-red-800", icon: XCircle },
+  }
+
+  const config = statusConfig[status]
+  const Icon = config.icon
+
+  return (
+    <span className={`px-2 py-1 inline-flex items-center text-xs leading-5 font-semibold rounded-full ${config.color}`}>
+      <Icon className="w-3 h-3 mr-1" />
+      {config.label}
+    </span>
+  )
+}
+
+// Brand Creation Modal
+const BrandCreateModal = ({
+  isOpen,
+  onClose,
+  onSuccess,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+}) => {
+  const [isLoading, setIsLoading] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string>("")
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<BrandFormData>({
+    resolver: zodResolver(brandSchema),
+  })
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      setImageFile(file)
+      const previewUrl = URL.createObjectURL(file)
+      setImagePreview(previewUrl)
+    }
+  }
+
+  const removeImage = () => {
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview)
+    }
+    setImageFile(null)
+    setImagePreview("")
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  const onSubmit = async (data: BrandFormData) => {
+    if (!imageFile) {
+      alert("Please select a brand image")
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const formData = new FormData()
+      formData.append("title", data.title)
+      formData.append("image", imageFile)
+
+      await createBrand(formData)
+      onSuccess()
+      reset()
+      removeImage()
+      onClose()
+    } catch (error) {
+      console.error("Failed to create brand:", error)
+      alert("Failed to create brand. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleClose = () => {
+    reset()
+    removeImage()
+    onClose()
+  }
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview)
+      }
+    }
+  }, [imagePreview])
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-900 rounded-lg w-full max-w-md border border-gray-800">
+        <div className="px-6 py-4 border-b border-gray-800">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-gray-100">Create New Brand</h2>
+            <button onClick={handleClose} className="text-gray-400 hover:text-gray-200 transition-colors">
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Brand Title</label>
+            <input
+              {...register("title")}
+              className="w-full h-12 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Enter brand title"
+            />
+            {errors.title && <p className="mt-2 text-sm text-red-400">{errors.title.message}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Brand Image *</label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-gray-900 hover:file:bg-blue-600"
+            />
+            {imagePreview && (
+              <div className="mt-4 relative inline-block">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="h-24 w-24 object-cover rounded-lg"
+                />
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full text-white hover:bg-red-600 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end space-x-4 pt-4">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors"
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-4 py-2 rounded-lg bg-blue-500 text-gray-900 font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Brand"
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
 
 // Category Creation Modal
 const CategoryCreateModal = ({
@@ -338,6 +582,7 @@ const CategoryCreateModal = ({
       if (imageFile) {
         formData.append("image", imageFile)
       }
+
       await createCategory(formData)
       onSuccess()
       reset()
@@ -377,6 +622,7 @@ const CategoryCreateModal = ({
             </button>
           </div>
         </div>
+
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
@@ -387,6 +633,7 @@ const CategoryCreateModal = ({
             />
             {errors.title && <p className="mt-2 text-sm text-red-400">{errors.title.message}</p>}
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Image (Optional)</label>
             <input
@@ -399,7 +646,7 @@ const CategoryCreateModal = ({
             {imagePreview && (
               <div className="mt-4 relative inline-block">
                 <img
-                  src={imagePreview || "/placeholder.svg"}
+                  src={imagePreview}
                   alt="Preview"
                   className="h-24 w-24 object-cover rounded-lg"
                 />
@@ -413,6 +660,7 @@ const CategoryCreateModal = ({
               </div>
             )}
           </div>
+
           <div className="flex justify-end space-x-4 pt-4">
             <button
               type="button"
@@ -458,6 +706,7 @@ const TopCategoryCreateModal = ({
   selectedCategoryId?: string
 }) => {
   const [isLoading, setIsLoading] = useState(false)
+
   const {
     register,
     handleSubmit,
@@ -506,6 +755,7 @@ const TopCategoryCreateModal = ({
             </button>
           </div>
         </div>
+
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
@@ -516,6 +766,7 @@ const TopCategoryCreateModal = ({
             />
             {errors.title && <p className="mt-2 text-sm text-red-400">{errors.title.message}</p>}
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
             <select
@@ -531,6 +782,7 @@ const TopCategoryCreateModal = ({
             </select>
             {errors.category && <p className="mt-2 text-sm text-red-400">{errors.category.message}</p>}
           </div>
+
           <div className="flex justify-end space-x-4 pt-4">
             <button
               type="button"
@@ -625,6 +877,7 @@ const SubCategoryCreateModal = ({
       if (imageFile) {
         formData.append("image", imageFile)
       }
+
       await createSubCategory(formData)
       onSuccess()
       reset()
@@ -664,6 +917,7 @@ const SubCategoryCreateModal = ({
             </button>
           </div>
         </div>
+
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
@@ -674,6 +928,7 @@ const SubCategoryCreateModal = ({
             />
             {errors.title && <p className="mt-2 text-sm text-red-400">{errors.title.message}</p>}
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Top Category</label>
             <select
@@ -689,6 +944,7 @@ const SubCategoryCreateModal = ({
             </select>
             {errors.topCategory && <p className="mt-2 text-sm text-red-400">{errors.topCategory.message}</p>}
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Image (Optional)</label>
             <input
@@ -701,7 +957,7 @@ const SubCategoryCreateModal = ({
             {imagePreview && (
               <div className="mt-4 relative inline-block">
                 <img
-                  src={imagePreview || "/placeholder.svg"}
+                  src={imagePreview}
                   alt="Preview"
                   className="h-24 w-24 object-cover rounded-lg"
                 />
@@ -715,6 +971,7 @@ const SubCategoryCreateModal = ({
               </div>
             )}
           </div>
+
           <div className="flex justify-end space-x-4 pt-4">
             <button
               type="button"
@@ -765,6 +1022,7 @@ const CategoryDropdown = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
   const selectedCategory = categories.find((cat) => cat._id === value)
 
   useEffect(() => {
@@ -773,6 +1031,7 @@ const CategoryDropdown = ({
         setIsOpen(false)
       }
     }
+
     document.addEventListener("mousedown", handleClickOutside)
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
@@ -805,10 +1064,12 @@ const CategoryDropdown = ({
             <span className="text-gray-400">{placeholder}</span>
           )}
         </div>
+
         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
+
       {isOpen && (
         <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
           {isLoading ? (
@@ -843,6 +1104,7 @@ const CategoryDropdown = ({
                 </div>
                 <span className="text-gray-400">No category</span>
               </button>
+
               {categories.map((category) => (
                 <button
                   key={category._id}
@@ -895,6 +1157,7 @@ const TopCategoryDropdown = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
   const selectedTopCategory = topCategories.find((cat) => cat._id === value)
 
   useEffect(() => {
@@ -903,6 +1166,7 @@ const TopCategoryDropdown = ({
         setIsOpen(false)
       }
     }
+
     document.addEventListener("mousedown", handleClickOutside)
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
@@ -928,10 +1192,12 @@ const TopCategoryDropdown = ({
             <span className="text-gray-400">{disabled ? "Select a category first" : placeholder}</span>
           )}
         </div>
+
         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
+
       {isOpen && !disabled && (
         <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
           {isLoading ? (
@@ -961,6 +1227,7 @@ const TopCategoryDropdown = ({
               >
                 <span className="text-gray-400">No top category</span>
               </button>
+
               {topCategories.length === 0 ? (
                 <div className="p-4 text-center text-gray-400">No top categories available for selected category</div>
               ) : (
@@ -999,7 +1266,6 @@ const SubCategoryDropdown = ({
   disabled = false,
   onCreateNew,
   selectedTopCategoryId,
-  topCategories,
 }: {
   subCategories: SubCategory[]
   value: string
@@ -1009,10 +1275,10 @@ const SubCategoryDropdown = ({
   disabled?: boolean
   onCreateNew?: (topCategoryId?: string) => void
   selectedTopCategoryId?: string
-  topCategories?: TopCategory[]
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
   const selectedSubCategory = subCategories.find((cat) => cat._id === value)
 
   useEffect(() => {
@@ -1021,6 +1287,7 @@ const SubCategoryDropdown = ({
         setIsOpen(false)
       }
     }
+
     document.addEventListener("mousedown", handleClickOutside)
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
@@ -1058,10 +1325,12 @@ const SubCategoryDropdown = ({
             <span className="text-gray-400">{disabled ? "Select a top category first" : placeholder}</span>
           )}
         </div>
+
         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
+
       {isOpen && !disabled && (
         <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
           {isLoading ? (
@@ -1091,6 +1360,7 @@ const SubCategoryDropdown = ({
               >
                 <span className="text-gray-400">No sub category</span>
               </button>
+
               {subCategories.length === 0 ? (
                 <div className="p-4 text-center text-gray-400">
                   No sub categories available for selected top category
@@ -1131,17 +1401,150 @@ const SubCategoryDropdown = ({
   )
 }
 
-export default function ProductPage() {
+// Enhanced Brand Dropdown Component
+const BrandDropdown = ({
+  brands,
+  value,
+  onChange,
+  isLoading,
+  placeholder = "Select a brand",
+  onCreateNew,
+}: {
+  brands: Brand[]
+  value: string
+  onChange: (brandId: string) => void
+  isLoading?: boolean
+  placeholder?: string
+  onCreateNew?: () => void
+}) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  const selectedBrand = brands.find((brand) => brand._id === value)
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full h-12 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent flex items-center justify-between"
+        disabled={isLoading}
+      >
+        <div className="flex items-center space-x-3">
+          {selectedBrand ? (
+            <>
+              <img
+                src={selectedBrand.image || "/placeholder.svg"}
+                alt={selectedBrand.title}
+                className="w-6 h-6 rounded object-cover"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.src = "/placeholder.svg"
+                }}
+              />
+              <span>{selectedBrand.title}</span>
+            </>
+          ) : (
+            <span className="text-gray-400">{placeholder}</span>
+          )}
+        </div>
+
+        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          {isLoading ? (
+            <div className="p-4 text-center text-gray-400">Loading brands...</div>
+          ) : (
+            <>
+              {onCreateNew && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCreateNew()
+                    setIsOpen(false)
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center space-x-3 border-b border-gray-700"
+                >
+                  <Building2 className="w-5 h-5 text-blue-400" />
+                  <span className="text-blue-400 font-medium">Create New Brand</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  onChange("")
+                  setIsOpen(false)
+                }}
+                className="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center space-x-3"
+              >
+                <div className="w-6 h-6 rounded bg-gray-600 flex items-center justify-center">
+                  <Building2 className="w-4 h-4 text-gray-400" />
+                </div>
+                <span className="text-gray-400">No brand</span>
+              </button>
+
+              {brands.map((brand) => (
+                <button
+                  key={brand._id}
+                  type="button"
+                  onClick={() => {
+                    onChange(brand._id)
+                    setIsOpen(false)
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-700 flex items-center space-x-3"
+                >
+                  <img
+                    src={brand.image || "/placeholder.svg"}
+                    alt={brand.title}
+                    className="w-6 h-6 rounded object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.src = "/placeholder.svg"
+                    }}
+                  />
+                  <span>{brand.title}</span>
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface ProductPageProps {
+  onLogout: () => void;
+}
+
+export default function ProductPage({ onLogout }: ProductPageProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [imageFiles, setImageFiles] = useState<Array<{ file: File; preview: string }>>([])
-  const [mainImageIndex, setMainImageIndex] = useState<number>(0)
+  const [variantImages, setVariantImages] = useState<Array<{ file: File | null; preview: string }>>([])
   const [products, setProducts] = useState<Product[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [categories, setCategories] = useState<Category[]>([])
   const [topCategories, setTopCategories] = useState<TopCategory[]>([])
   const [subCategories, setSubCategories] = useState<SubCategory[]>([])
+  const [brands, setBrands] = useState<Brand[]>([])
   const [allTopCategories, setAllTopCategories] = useState<TopCategory[]>([])
   const [allSubCategories, setAllSubCategories] = useState<SubCategory[]>([])
   const [selectedCategoryId, setSelectedCategoryId] = useState("")
@@ -1152,14 +1555,15 @@ export default function ProductPage() {
   const [error, setError] = useState<string | null>(null)
   const [vendorData, setVendorData] = useState<VendorData | null>(null)
 
-  // Modal states for creating categories
+  // Modal states for creating categories and brands
   const [showCategoryCreateModal, setShowCategoryCreateModal] = useState(false)
   const [showTopCategoryCreateModal, setShowTopCategoryCreateModal] = useState(false)
   const [showSubCategoryCreateModal, setShowSubCategoryCreateModal] = useState(false)
+  const [showBrandCreateModal, setShowBrandCreateModal] = useState(false)
   const [createModalCategoryId, setCreateModalCategoryId] = useState<string>("")
   const [createModalTopCategoryId, setCreateModalTopCategoryId] = useState<string>("")
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   const {
     register,
@@ -1171,51 +1575,35 @@ export default function ProductPage() {
   } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: {
-      stock: 0,
-      types: [{ title: "", price: 0, withoutDiscountPrice: 0, smallDescription: "" }],
+      types: [{ weightCountOrAny: "", price: 0, mrp: 0, tag: "", stock: 0 }],
     },
   })
 
   // Check authentication and get vendor data
   useEffect(() => {
-    const checkAuth = () => {
-      const storedVendorData = localStorage.getItem("vendorData")
-      if (!storedVendorData) {
-        window.location.href = "/vendor-auth"
-        return
-      }
-
-      try {
-        const parsedVendorData = JSON.parse(storedVendorData)
-        setVendorData(parsedVendorData)
-      } catch (error) {
-        console.error("Failed to parse vendor data:", error)
-        localStorage.removeItem("vendorData")
-        window.location.href = "/vendor-auth"
-      }
+    const storedVendorData = getVendorData()
+    if (!storedVendorData) {
+      onLogout()
+      return
     }
-
-    checkAuth()
-  }, [])
-
-  // Logout function
-  const handleLogout = () => {
-    localStorage.removeItem("vendorData")
-    window.location.href = "/vendor-auth"
-  }
+    setVendorData(storedVendorData)
+  }, [onLogout])
 
   // Refresh all data function
   const refreshAllData = async () => {
     try {
       setIsCategoriesLoading(true)
-      const [categoriesData, topCategoriesData, subCategoriesData] = await Promise.all([
+      const [categoriesData, topCategoriesData, subCategoriesData, brandsData] = await Promise.all([
         getCategories(),
         getTopCategories(),
         getSubCategories(),
+        getBrands(),
       ])
+
       setCategories(categoriesData)
       setAllTopCategories(topCategoriesData)
       setAllSubCategories(subCategoriesData)
+      setBrands(brandsData)
     } catch (error) {
       console.error("Failed to refresh data:", error)
       setError("Failed to refresh data. Please try again.")
@@ -1284,22 +1672,37 @@ export default function ProductPage() {
     [setValue],
   )
 
+  const handleBrandChange = useCallback(
+    (brandId: string) => {
+      try {
+        setValue("brand", brandId)
+      } catch (error) {
+        console.error("Error handling brand change:", error)
+        setError("Failed to update brand")
+      }
+    },
+    [setValue],
+  )
+
   // Fetch initial data
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
         setIsCategoriesLoading(true)
         setError(null)
-        const [productsData, categoriesData, topCategoriesData, subCategoriesData] = await Promise.all([
-          vendorData ? getProducts(vendorData.id) : Promise.resolve([]), // Fetch products by creatorId
+        const [productsData, categoriesData, topCategoriesData, subCategoriesData, brandsData] = await Promise.all([
+          getProducts(),
           getCategories(),
           getTopCategories(),
           getSubCategories(),
+          getBrands(),
         ])
+
         setProducts(productsData)
         setCategories(categoriesData)
         setAllTopCategories(topCategoriesData)
         setAllSubCategories(subCategoriesData)
+        setBrands(brandsData)
       } catch (error) {
         console.error("Failed to fetch initial data:", error)
         setError("Failed to load data. Please refresh the page.")
@@ -1317,17 +1720,16 @@ export default function ProductPage() {
   // Handle search with debouncing
   useEffect(() => {
     const handleSearch = async () => {
-      if (!vendorData) return // Ensure vendorData is available for search
       if (!searchQuery && !selectedCategoryId) {
-        const data = await getProducts(vendorData.id) // Fetch products by creatorId
+        const data = await getProducts()
         setProducts(data)
         return
       }
+
       setIsSearching(true)
       try {
         const data = await searchProducts(searchQuery, selectedCategoryId || undefined)
-        // Client-side filter to ensure only current vendor's products are shown if searchProducts is global
-        setProducts(data.filter((p) => p.creatorId === vendorData.id))
+        setProducts(data)
       } catch (error) {
         console.error("Failed to search products:", error)
         setError("Search failed. Please try again.")
@@ -1336,9 +1738,11 @@ export default function ProductPage() {
       }
     }
 
-    const debounceTimeout = setTimeout(handleSearch, 300)
-    return () => clearTimeout(debounceTimeout)
-  }, [searchQuery, selectedCategoryId, vendorData]) // Added vendorData to dependencies
+    if (vendorData) {
+      const debounceTimeout = setTimeout(handleSearch, 300)
+      return () => clearTimeout(debounceTimeout)
+    }
+  }, [searchQuery, selectedCategoryId, vendorData])
 
   const resetFormCompletely = () => {
     reset({
@@ -1347,55 +1751,57 @@ export default function ProductPage() {
       category: "",
       topCategory: "",
       subCategory: "",
-      stock: 0,
-      weightOrCount: "",
-      tag: [],
-      types: [{ title: "", price: 0, withoutDiscountPrice: 0, smallDescription: "" }],
+      brand: "",
+      tag: [""],
+      types: [{ weightCountOrAny: "", price: 0, mrp: 0, tag: "", stock: 0 }],
     })
-    setImageFiles([])
-    setMainImageIndex(0)
+    setVariantImages([{ file: null, preview: "" }])
     setEditingProduct(null)
     setTopCategories([])
     setSubCategories([])
     setError(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
+    fileInputRefs.current.forEach(ref => {
+      if (ref) ref.value = ""
+    })
   }
 
   const onSubmit = async (data: ProductFormData) => {
-    if (!vendorData) {
-      setError("Vendor data not found. Please login again.")
-      return
-    }
-
     setIsLoading(true)
     setError(null)
     try {
       const formData = new FormData()
+      // Add basic product data
+      formData.append("title", data.title)
+      formData.append("description", data.description)
+      formData.append("topCategory", data.topCategory)
+      formData.append("subCategory", data.subCategory)
 
-      // Add creatorId from vendor data
-      formData.append("creatorId", vendorData.id)
+      if (data.category) {
+        formData.append("category", data.category)
+      }
 
-      Object.entries(data).forEach(([key, value]) => {
-        if (key !== "types" && key !== "image") {
-          if (value !== undefined && value !== "") {
-            if (key === "category" && value === "") {
-              formData.append(key, "null")
-            } else {
-              formData.append(key, String(value))
-            }
-          }
+      if (data.brand) {
+        formData.append("brand", data.brand)
+      }
+
+      if (data.tag) {
+        formData.append("tag", JSON.stringify(Array.isArray(data.tag) ? data.tag : [data.tag]))
+      }
+
+      // Prepare types data with image handling
+      const typesWithImages = data.types.map((type, index) => ({
+        ...type,
+        imageUrl: variantImages[index]?.file ? `variant_${index}` : ""
+      }))
+
+      formData.append("types", JSON.stringify(typesWithImages))
+
+      // Add variant images
+      variantImages.forEach((variantImage) => {
+        if (variantImage.file) {
+          formData.append("images", variantImage.file)
         }
       })
-      formData.append("types", JSON.stringify(data.types))
-      formData.append("mainImageIndex", String(mainImageIndex))
-
-      if (imageFiles.length > 0) {
-        imageFiles.forEach((image) => {
-          formData.append(`images`, image.file)
-        })
-      }
 
       if (editingProduct) {
         await updateProduct(editingProduct._id, formData)
@@ -1403,10 +1809,8 @@ export default function ProductPage() {
         await createProduct(formData)
       }
 
-      const productsData = await getProducts(vendorData.id) // Fetch products by creatorId after save
+      const productsData = await getProducts()
       setProducts(productsData)
-      const categoriesData = await getCategories()
-      setCategories(categoriesData)
       resetFormCompletely()
       setShowForm(false)
     } catch (error) {
@@ -1423,7 +1827,7 @@ export default function ProductPage() {
       setError(null)
       try {
         await deleteProduct(id)
-        const data = await getProducts(vendorData!.id) // Fetch products by creatorId after delete
+        const data = await getProducts()
         setProducts(data)
       } catch (error) {
         console.error("Failed to delete product:", error)
@@ -1440,6 +1844,7 @@ export default function ProductPage() {
       resetFormCompletely()
       const fullProduct = await getProductById(product._id)
       setEditingProduct(fullProduct)
+
       setValue("title", fullProduct.title)
       setValue("description", fullProduct.description)
 
@@ -1468,6 +1873,7 @@ export default function ProductPage() {
           return subCat.topCategory && subCat.topCategory._id === topCategoryId
         })
         setSubCategories(filteredSubCategories)
+
         const subCategoryId =
           typeof fullProduct.subCategory === "object" ? fullProduct.subCategory._id : fullProduct.subCategory || ""
         setValue("subCategory", subCategoryId)
@@ -1476,21 +1882,23 @@ export default function ProductPage() {
         setValue("subCategory", "")
       }
 
-      setValue("stock", fullProduct.stock)
-      setValue("weightOrCount", fullProduct.weightOrCount)
+      const brandId = fullProduct.brand
+        ? typeof fullProduct.brand === "object"
+          ? fullProduct.brand._id
+          : fullProduct.brand
+        : ""
+      setValue("brand", brandId)
+
       setValue("tag", fullProduct.tag ? fullProduct.tag[0] : "")
-      setMainImageIndex(0)
 
       if (fullProduct.types && fullProduct.types.length > 0) {
-        setValue(
-          "types",
-          fullProduct.types.map((type: any) => ({
-            title: type.title || "",
-            price: type.price || 0,
-            withoutDiscountPrice: type.withoutDiscountPrice || 0,
-            smallDescription: type.smallDescription || "",
-          })),
-        )
+        setValue("types", fullProduct.types)
+        // Set variant images from existing product
+        const existingImages = fullProduct.types.map((type: ProductVariant) => ({
+          file: null,
+          preview: type.imageUrl || ""
+        }))
+        setVariantImages(existingImages)
       }
 
       setShowForm(true)
@@ -1500,42 +1908,40 @@ export default function ProductPage() {
     }
   }
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (files && files.length > 0) {
-      const newImageFiles = [...imageFiles]
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-        const previewUrl = URL.createObjectURL(file)
-        newImageFiles.push({
-          file,
-          preview: previewUrl,
-        })
+  const handleVariantImageChange = (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      const newVariantImages = [...variantImages]
+      // Clean up previous preview URL
+      if (newVariantImages[index]?.preview && newVariantImages[index]?.file) {
+        URL.revokeObjectURL(newVariantImages[index].preview)
       }
-      setImageFiles(newImageFiles)
+
+      const previewUrl = URL.createObjectURL(file)
+      newVariantImages[index] = { file, preview: previewUrl }
+      setVariantImages(newVariantImages)
     }
   }
 
-  const removeImage = (index: number) => {
-    const newImageFiles = [...imageFiles]
-    URL.revokeObjectURL(newImageFiles[index].preview)
-    newImageFiles.splice(index, 1)
-    setImageFiles(newImageFiles)
-    if (mainImageIndex >= newImageFiles.length) {
-      setMainImageIndex(Math.max(0, newImageFiles.length - 1))
-    } else if (index === mainImageIndex && newImageFiles.length > 0) {
-      setMainImageIndex(0)
+  const removeVariantImage = (index: number) => {
+    const newVariantImages = [...variantImages]
+    if (newVariantImages[index]?.preview && newVariantImages[index]?.file) {
+      URL.revokeObjectURL(newVariantImages[index].preview)
     }
-  }
+    newVariantImages[index] = { file: null, preview: "" }
+    setVariantImages(newVariantImages)
 
-  const setMainImage = (index: number) => {
-    setMainImageIndex(index)
+    if (fileInputRefs.current[index]) {
+      fileInputRefs.current[index]!.value = ""
+    }
   }
 
   useEffect(() => {
     return () => {
-      imageFiles.forEach((image) => {
-        URL.revokeObjectURL(image.preview)
+      variantImages.forEach((variantImage) => {
+        if (variantImage.preview && variantImage.file) {
+          URL.revokeObjectURL(variantImage.preview)
+        }
       })
     }
   }, [])
@@ -1544,7 +1950,8 @@ export default function ProductPage() {
 
   const addProductType = () => {
     const currentTypes = watch("types") || []
-    setValue("types", [...currentTypes, { title: "", price: 0, withoutDiscountPrice: 0, smallDescription: "" }])
+    setValue("types", [...currentTypes, { weightCountOrAny: "", price: 0, mrp: 0, tag: "", stock: 0 }])
+    setVariantImages([...variantImages, { file: null, preview: "" }])
   }
 
   const removeProductType = (index: number) => {
@@ -1554,6 +1961,13 @@ export default function ProductPage() {
         "types",
         currentTypes.filter((_, i) => i !== index),
       )
+      // Clean up image preview
+      const newVariantImages = [...variantImages]
+      if (newVariantImages[index]?.preview && newVariantImages[index]?.file) {
+        URL.revokeObjectURL(newVariantImages[index].preview)
+      }
+      newVariantImages.splice(index, 1)
+      setVariantImages(newVariantImages)
     }
   }
 
@@ -1562,13 +1976,17 @@ export default function ProductPage() {
     resetFormCompletely()
   }
 
+  const getTotalStock = (product: Product): number => {
+    return product.types?.reduce((total, type) => total + (type.stock || 0), 0) || 0
+  }
+
   const getStockStatus = (stock: number) => {
     if (stock <= 0) return { label: "Out of Stock", color: "bg-red-100 text-red-800" }
     if (stock < 10) return { label: "Low Stock", color: "bg-yellow-100 text-yellow-800" }
     return { label: "In Stock", color: "bg-green-100 text-green-800" }
   }
 
-  // Handle create category modal
+  // Handle create modals
   const handleCreateCategory = () => {
     setShowCategoryCreateModal(true)
   }
@@ -1581,6 +1999,10 @@ export default function ProductPage() {
   const handleCreateSubCategory = (topCategoryId?: string) => {
     setCreateModalTopCategoryId(topCategoryId || "")
     setShowSubCategoryCreateModal(true)
+  }
+
+  const handleCreateBrand = () => {
+    setShowBrandCreateModal(true)
   }
 
   const handleCategoryCreateSuccess = async () => {
@@ -1611,26 +2033,14 @@ export default function ProductPage() {
     }
   }
 
+  const handleBrandCreateSuccess = async () => {
+    await refreshAllData()
+  }
+
   if (isInitialLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <LoadingSpinner />
-      </div>
-    )
-  }
-
-  if (!vendorData) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-400 mb-4">Please login to access this page</p>
-          <button
-            onClick={() => (window.location.href = "/vendor-auth")}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-          >
-            Go to Login
-          </button>
-        </div>
       </div>
     )
   }
@@ -1654,11 +2064,12 @@ export default function ProductPage() {
             <Package className="w-8 h-8 text-blue-400" />
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-100">Products</h1>
-              <p className="text-sm text-gray-400">
-                Welcome, {vendorData.name} ({vendorData.brandName})
-              </p>
+              {vendorData && (
+                <p className="text-sm text-gray-400">Welcome, {vendorData.name}</p>
+              )}
             </div>
           </div>
+
           <div className="flex items-center space-x-4">
             <button
               onClick={() => {
@@ -1670,13 +2081,15 @@ export default function ProductPage() {
               <Plus className="w-4 h-4 mr-2" />
               Add Product
             </button>
+
             <button
-              onClick={handleLogout}
-              className="hidden sm:inline-flex items-center px-4 py-2 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 hover:text-gray-100 hover:bg-gray-800 transition-colors"
+              onClick={onLogout}
+              className="hidden sm:inline-flex items-center px-4 py-2 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-transparent hover:bg-gray-800 transition-colors"
             >
               <LogOut className="w-4 h-4 mr-2" />
               Logout
             </button>
+
             <button
               onClick={() => setShowMobileMenu(!showMobileMenu)}
               className="sm:hidden p-2 rounded-md text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
@@ -1685,6 +2098,7 @@ export default function ProductPage() {
             </button>
           </div>
         </div>
+
         {/* Mobile Menu */}
         {showMobileMenu && (
           <div className="sm:hidden mt-4 space-y-4">
@@ -1699,9 +2113,10 @@ export default function ProductPage() {
               <Plus className="w-4 h-4 mr-2" />
               Add Product
             </button>
+
             <button
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center px-4 py-2 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 hover:text-gray-100 hover:bg-gray-800 transition-colors"
+              onClick={onLogout}
+              className="w-full flex items-center justify-center px-4 py-2 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-transparent hover:bg-gray-800 transition-colors"
             >
               <LogOut className="w-4 h-4 mr-2" />
               Logout
@@ -1723,6 +2138,7 @@ export default function ProductPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+
           <CategoryDropdown
             categories={categories}
             value={selectedCategoryId}
@@ -1752,21 +2168,14 @@ export default function ProductPage() {
                         Category
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                        Top Category
+                        Brand
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                        Sub Category
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                        Tag
+                        Status
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                         Stock
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                        Status
-                      </th>{" "}
-                      {/* Added Status Header */}
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                         Variants
                       </th>
@@ -1777,14 +2186,17 @@ export default function ProductPage() {
                   </thead>
                   <tbody className="bg-gray-800 divide-y divide-gray-700">
                     {products.map((product) => {
-                      const stockStatus = getStockStatus(product.stock)
+                      const totalStock = getTotalStock(product)
+                      const stockStatus = getStockStatus(totalStock)
+                      const firstVariantImage = product.types?.[0]?.imageUrl
+
                       return (
                         <tr key={product._id} className="hover:bg-gray-750">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              {product.imageUrl && product.imageUrl.length > 0 ? (
+                              {firstVariantImage ? (
                                 <img
-                                  src={product.imageUrl[0] || "/placeholder.svg"}
+                                  src={firstVariantImage}
                                   alt={product.title}
                                   className="w-10 h-10 rounded-full object-cover"
                                   onError={(e) => {
@@ -1799,7 +2211,9 @@ export default function ProductPage() {
                               )}
                               <div className="ml-4">
                                 <div className="text-sm font-medium text-gray-100">{product.title}</div>
-                                <div className="text-xs text-gray-400">{product.weightOrCount}</div>
+                                <div className="text-xs text-gray-400">
+                                  {product.types?.[0]?.weightCountOrAny || "No variants"}
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -1811,25 +2225,29 @@ export default function ProductPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-300">
-                              {typeof product.topCategory === "object" && product.topCategory
-                                ? product.topCategory.title
-                                : getTopCategoryName(product.topCategory, allTopCategories)}
+                            <div className="flex items-center space-x-2">
+                              {typeof product.brand === "object" && product.brand ? (
+                                <>
+                                  <img
+                                    src={product.brand.image}
+                                    alt={product.brand.title}
+                                    className="w-6 h-6 rounded object-cover"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement
+                                      target.src = "/placeholder.svg"
+                                    }}
+                                  />
+                                  <span className="text-sm text-gray-300">{product.brand.title}</span>
+                                </>
+                              ) : (
+                                <span className="text-sm text-gray-400">
+                                  {getBrandName(product.brand, brands)}
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-300">
-                              {typeof product.subCategory === "object" && product.subCategory
-                                ? product.subCategory.title
-                                : getSubCategoryName(product.subCategory, allSubCategories)}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {product.tag && (
-                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                {product.tag}
-                              </span>
-                            )}
+                            <StatusBadge status={product.status} />
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
@@ -1838,11 +2256,8 @@ export default function ProductPage() {
                               >
                                 {stockStatus.label}
                               </span>
-                              <span className="ml-2 text-sm text-gray-300">{product.stock} units</span>
+                              <span className="ml-2 text-sm text-gray-300">{totalStock} units</span>
                             </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-300">{product.status}</div> {/* Display Status */}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-300">{product.types?.length || 0} variants</div>
@@ -1873,14 +2288,17 @@ export default function ProductPage() {
               {/* Mobile Card View */}
               <div className="sm:hidden divide-y divide-gray-700">
                 {products.map((product) => {
-                  const stockStatus = getStockStatus(product.stock)
+                  const totalStock = getTotalStock(product)
+                  const stockStatus = getStockStatus(totalStock)
+                  const firstVariantImage = product.types?.[0]?.imageUrl
+
                   return (
                     <div key={product._id} className="p-4 space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
-                          {product.imageUrl && product.imageUrl.length > 0 ? (
+                          {firstVariantImage ? (
                             <img
-                              src={product.imageUrl[0] || "/placeholder.svg"}
+                              src={firstVariantImage}
                               alt={product.title}
                               className="w-12 h-12 rounded-full object-cover"
                               onError={(e) => {
@@ -1921,45 +2339,47 @@ export default function ProductPage() {
                           </button>
                         </div>
                       </div>
+
                       <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <span className="text-gray-400">Top Category:</span>
-                          <span className="ml-2 text-gray-100">
-                            {typeof product.topCategory === "object" && product.topCategory
-                              ? product.topCategory.title
-                              : getTopCategoryName(product.topCategory, allTopCategories)}
-                          </span>
+                        <div className="col-span-2">
+                          <span className="text-gray-400">Brand:</span>
+                          <div className="flex items-center space-x-2 mt-1">
+                            {typeof product.brand === "object" && product.brand ? (
+                              <>
+                                <img
+                                  src={product.brand.image}
+                                  alt={product.brand.title}
+                                  className="w-5 h-5 rounded object-cover"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement
+                                    target.src = "/placeholder.svg"
+                                  }}
+                                />
+                                <span className="text-gray-100">{product.brand.title}</span>
+                              </>
+                            ) : (
+                              <span className="text-gray-400">
+                                {getBrandName(product.brand, brands)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div>
-                          <span className="text-gray-400">Sub Category:</span>
-                          <span className="ml-2 text-gray-100">
-                            {typeof product.subCategory === "object" && product.subCategory
-                              ? product.subCategory.title
-                              : getSubCategoryName(product.subCategory, allSubCategories)}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-gray-400">Tag:</span>
-                          {product.tag && (
-                            <span className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                              {product.tag}
-                            </span>
-                          )}
+                          <span className="text-gray-400">Status:</span>
+                          <div className="mt-1">
+                            <StatusBadge status={product.status} />
+                          </div>
                         </div>
                         <div>
                           <span className="text-gray-400">Variants:</span>
                           <span className="ml-2 text-gray-100">{product.types?.length || 0}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-400">Status:</span>
-                          <span className="ml-2 text-gray-100">{product.status}</span> {/* Display Status */}
                         </div>
                         <div className="col-span-2 mt-1">
                           <span className="text-gray-400">Stock:</span>
                           <span
                             className={`ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${stockStatus.color}`}
                           >
-                            {stockStatus.label} ({product.stock})
+                            {stockStatus.label} ({totalStock})
                           </span>
                         </div>
                       </div>
@@ -1986,6 +2406,7 @@ export default function ProductPage() {
                 </button>
               </div>
             </div>
+
             <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -1996,6 +2417,7 @@ export default function ProductPage() {
                   />
                   {errors.title && <p className="mt-2 text-sm text-red-400">{errors.title.message}</p>}
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
                   <CategoryDropdown
@@ -2008,9 +2430,10 @@ export default function ProductPage() {
                   {errors.category && <p className="mt-2 text-sm text-red-400">{errors.category.message}</p>}
                 </div>
               </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Top Category</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Top Category *</label>
                   <TopCategoryDropdown
                     topCategories={topCategories}
                     value={watch("topCategory") || ""}
@@ -2026,14 +2449,10 @@ export default function ProductPage() {
                     selectedCategoryId={watch("category")}
                   />
                   {errors.topCategory && <p className="mt-2 text-sm text-red-400">{errors.topCategory.message}</p>}
-                  {watch("category") && topCategories.length === 0 && (
-                    <p className="mt-2 text-sm text-yellow-400">
-                      No top categories available for the selected category.
-                    </p>
-                  )}
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Sub Category</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Sub Category *</label>
                   <SubCategoryDropdown
                     subCategories={subCategories}
                     value={watch("subCategory") || ""}
@@ -2049,41 +2468,22 @@ export default function ProductPage() {
                     selectedTopCategoryId={watch("topCategory")}
                   />
                   {errors.subCategory && <p className="mt-2 text-sm text-red-400">{errors.subCategory.message}</p>}
-                  {watch("topCategory") && subCategories.length === 0 && (
-                    <p className="mt-2 text-sm text-yellow-400">
-                      No sub categories available for the selected top category.
-                    </p>
-                  )}
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
-                <textarea
-                  {...register("description")}
-                  className="w-full h-32 px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                />
-                {errors.description && <p className="mt-2 text-sm text-red-400">{errors.description.message}</p>}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Weight or Count</label>
-                  <input
-                    {...register("weightOrCount")}
-                    className="w-full h-12 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g., 500g, 1kg, 5 pieces"
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Brand</label>
+                  <BrandDropdown
+                    brands={brands}
+                    value={watch("brand") || ""}
+                    onChange={handleBrandChange}
+                    isLoading={isCategoriesLoading}
+                    onCreateNew={handleCreateBrand}
                   />
-                  {errors.weightOrCount && <p className="mt-2 text-sm text-red-400">{errors.weightOrCount.message}</p>}
+                  {errors.brand && <p className="mt-2 text-sm text-red-400">{errors.brand.message}</p>}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Stock</label>
-                  <input
-                    type="number"
-                    {...register("stock", { valueAsNumber: true })}
-                    className="w-full h-12 px-4 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Available quantity"
-                  />
-                  {errors.stock && <p className="mt-2 text-sm text-red-400">{errors.stock.message}</p>}
-                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Tag</label>
                   <input
@@ -2093,91 +2493,17 @@ export default function ProductPage() {
                   />
                 </div>
               </div>
-              {/* Image upload section */}
+
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Images</label>
-                <div className="flex items-center space-x-4">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    multiple
-                    className="w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-gray-900 hover:file:bg-blue-600"
-                  />
-                </div>
-                {/* Image previews */}
-                {imageFiles.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-sm text-gray-300 mb-2">Selected images (click to set as main image):</p>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
-                      {imageFiles.map((image, index) => (
-                        <div
-                          key={index}
-                          className={`relative group ${mainImageIndex === index ? "ring-2 ring-blue-500" : ""}`}
-                        >
-                          <img
-                            src={image.preview || "/placeholder.svg"}
-                            alt={`Preview ${index + 1}`}
-                            className="h-24 w-full object-cover rounded-lg cursor-pointer"
-                            onClick={() => setMainImage(index)}
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.src = "/placeholder.svg"
-                            }}
-                          />
-                          {mainImageIndex === index && (
-                            <div className="absolute top-0 left-0 bg-blue-500 text-xs text-white px-2 py-1 rounded-tl-lg rounded-br-lg">
-                              Main
-                            </div>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => removeImage(index)}
-                            className="absolute top-1 right-1 p-1 bg-red-500 rounded-full text-gray-900 hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* Show existing images when editing */}
-                {editingProduct &&
-                  editingProduct.imageUrl &&
-                  editingProduct.imageUrl.length > 0 &&
-                  imageFiles.length === 0 && (
-                    <div className="mt-4">
-                      <p className="text-sm text-gray-400 mb-2">Current images:</p>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
-                        {editingProduct.imageUrl.map((imageUrl, index) => (
-                          <div
-                            key={index}
-                            className={`relative ${mainImageIndex === index ? "ring-2 ring-blue-500" : ""}`}
-                          >
-                            <img
-                              src={imageUrl || "/placeholder.svg"}
-                              alt={`Current ${index + 1}`}
-                              className="h-24 w-full object-cover rounded-lg cursor-pointer"
-                              onClick={() => setMainImage(index)}
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement
-                                target.src = "/placeholder.svg"
-                              }}
-                            />
-                            {index === 0 && (
-                              <div className="absolute top-0 left-0 bg-blue-500 text-xs text-white px-2 py-1 rounded-tl-lg rounded-br-lg">
-                                Main
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                <textarea
+                  {...register("description")}
+                  className="w-full h-32 px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                />
+                {errors.description && <p className="mt-2 text-sm text-red-400">{errors.description.message}</p>}
               </div>
-              {/* Product Types Section */}
+
+              {/* Product Variants Section */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-medium text-gray-200">Product Variants</h3>
@@ -2190,7 +2516,9 @@ export default function ProductPage() {
                     Add Variant
                   </button>
                 </div>
+
                 {errors.types && <p className="text-sm text-red-400">{errors.types.message}</p>}
+
                 <div className="space-y-6">
                   {productTypes.map((_, index) => (
                     <div key={index} className="p-4 border border-gray-700 rounded-lg space-y-4">
@@ -2206,18 +2534,48 @@ export default function ProductPage() {
                           </button>
                         )}
                       </div>
+
+                      {/* Variant Image Upload */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Variant Image *</label>
                         <input
-                          {...register(`types.${index}.title`)}
-                          className="w-full h-10 px-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="e.g., Standard, Premium, Pro"
+                          ref={(el) => (fileInputRefs.current[index] = el)}
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleVariantImageChange(index, e)}
+                          className="w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-500 file:text-gray-900 hover:file:bg-blue-600"
                         />
-                        {errors.types?.[index]?.title && (
-                          <p className="mt-1 text-xs text-red-400">{errors.types[index]?.title?.message}</p>
+                        {variantImages[index]?.preview && (
+                          <div className="mt-4 relative inline-block">
+                            <img
+                              src={variantImages[index].preview}
+                              alt={`Variant ${index + 1} preview`}
+                              className="h-24 w-24 object-cover rounded-lg"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeVariantImage(index)}
+                              className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full text-white hover:bg-red-600 transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
                         )}
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Weight/Count/Variant</label>
+                        <input
+                          {...register(`types.${index}.weightCountOrAny`)}
+                          className="w-full h-10 px-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="e.g., 500g, 1kg, Large, Medium"
+                        />
+                        {errors.types?.[index]?.weightCountOrAny && (
+                          <p className="mt-1 text-xs text-red-400">{errors.types[index]?.weightCountOrAny?.message}</p>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-300 mb-2">Price</label>
                           <div className="relative">
@@ -2233,39 +2591,53 @@ export default function ProductPage() {
                             <p className="mt-1 text-xs text-red-400">{errors.types[index]?.price?.message}</p>
                           )}
                         </div>
+
                         <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">Without Discount Price</label>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">MRP</label>
                           <div className="relative">
                             <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                             <input
                               type="number"
-                              step="0.01"
-                              {...register(`types.${index}.withoutDiscountPrice`, { valueAsNumber: true })}
+                              step="1"
+                              {...register(`types.${index}.mrp`, { valueAsNumber: true })}
                               className="w-full h-10 pl-9 px-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             />
                           </div>
-                          {errors.types?.[index]?.withoutDiscountPrice && (
-                            <p className="mt-1 text-xs text-red-400">
-                              {errors.types[index]?.withoutDiscountPrice?.message}
-                            </p>
+                          {errors.types?.[index]?.mrp && (
+                            <p className="mt-1 text-xs text-red-400">{errors.types[index]?.mrp?.message}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">Stock</label>
+                          <input
+                            type="number"
+                            {...register(`types.${index}.stock`, { valueAsNumber: true })}
+                            className="w-full h-10 px-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Available quantity"
+                          />
+                          {errors.types?.[index]?.stock && (
+                            <p className="mt-1 text-xs text-red-400">{errors.types[index]?.stock?.message}</p>
                           )}
                         </div>
                       </div>
+
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">Small Description</label>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Tag</label>
                         <textarea
-                          {...register(`types.${index}.smallDescription`)}
+                          {...register(`types.${index}.tag`)}
                           className="w-full h-20 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                          placeholder="Brief description of this product variant"
+                          placeholder="Brief description or tag for this variant"
                         />
-                        {errors.types?.[index]?.smallDescription && (
-                          <p className="mt-1 text-xs text-red-400">{errors.types[index]?.smallDescription?.message}</p>
+                        {errors.types?.[index]?.tag && (
+                          <p className="mt-1 text-xs text-red-400">{errors.types[index]?.tag?.message}</p>
                         )}
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
+
               <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-4 space-y-4 space-y-reverse sm:space-y-0 pt-6">
                 <button
                   type="button"
@@ -2294,12 +2666,14 @@ export default function ProductPage() {
           </div>
         </div>
       )}
-      {/* Category Creation Modals */}
+
+      {/* Creation Modals */}
       <CategoryCreateModal
         isOpen={showCategoryCreateModal}
         onClose={() => setShowCategoryCreateModal(false)}
         onSuccess={handleCategoryCreateSuccess}
       />
+
       <TopCategoryCreateModal
         isOpen={showTopCategoryCreateModal}
         onClose={() => setShowTopCategoryCreateModal(false)}
@@ -2307,12 +2681,19 @@ export default function ProductPage() {
         categories={categories}
         selectedCategoryId={createModalCategoryId}
       />
+
       <SubCategoryCreateModal
         isOpen={showSubCategoryCreateModal}
         onClose={() => setShowSubCategoryCreateModal(false)}
         onSuccess={handleSubCategoryCreateSuccess}
         topCategories={allTopCategories}
         selectedTopCategoryId={createModalTopCategoryId}
+      />
+
+      <BrandCreateModal
+        isOpen={showBrandCreateModal}
+        onClose={() => setShowBrandCreateModal(false)}
+        onSuccess={handleBrandCreateSuccess}
       />
     </div>
   )
