@@ -20,7 +20,11 @@ import {
     AlertCircle,
     MapPin,
     Building,
+    XCircle,
 } from "lucide-react"
+
+// Import the shared Input component
+import { Input } from '@/components/ui/Input'
 
 // API URL from environment variables
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api"
@@ -132,34 +136,6 @@ const Button = ({
     )
 }
 
-// Custom Input Component
-const Input = ({
-    className = "",
-    type = "text",
-    placeholder,
-    value,
-    onChange,
-    ...props
-}: {
-    className?: string
-    type?: string
-    placeholder?: string
-    value?: string | number
-    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
-    [key: string]: any
-}) => {
-    return (
-        <input
-            type={type}
-            className={`flex h-10 w-full rounded-md border border-gray-600 bg-gray-700 px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
-            placeholder={placeholder}
-            value={value}
-            onChange={onChange}
-            {...props}
-        />
-    )
-}
-
 // Card Components
 const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => {
     return <div className={`rounded-lg border shadow-sm ${className}`}>{children}</div>
@@ -248,18 +224,6 @@ const SheetFooter = ({ children, className = "" }: { children: React.ReactNode; 
     return <div className={`flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 ${className}`}>{children}</div>
 }
 
-// Toast function (simplified version)
-const toast = {
-    success: (message: string) => {
-        console.log("Success:", message)
-        // In a real implementation, this would show a toast
-    },
-    error: (message: string) => {
-        console.error("Error:", message)
-        // In a real implementation, this would show a toast
-    },
-}
-
 // Loading Spinner Component
 const LoadingSpinner = () => (
     <div className="flex items-center justify-center p-8">
@@ -304,20 +268,21 @@ export default function UsersPage() {
     // Fetch users data
     useEffect(() => {
         const fetchUsers = async () => {
+            setApiError(null) // Clear previous errors
+            setApiSuccess(null) // Clear previous success messages
             try {
                 setIsLoading(true)
                 const response = await axios.get<ApiResponse>(`${API_URL}/users?limit=1000`)
                 if (response.data && response.data.success) {
                     setUsers(response.data.data)
                     setTotalUsers(response.data.totalUsers)
+                    setApiSuccess("Users loaded successfully!")
                 } else {
                     setApiError(response.data.message || "Failed to fetch users")
-                    toast.error("Failed to fetch users")
                 }
             } catch (error) {
                 console.error("Error fetching users:", error)
-                setApiError("An error occurred while fetching users")
-                toast.error("Failed to fetch users")
+                setApiError("An error occurred while fetching users.")
             } finally {
                 setIsLoading(false)
             }
@@ -345,56 +310,64 @@ export default function UsersPage() {
     const handleViewUser = (user: User) => {
         setSelectedUser(user)
         setUserDetailOpen(true)
+        setApiError(null) // Clear messages when opening sheet
+        setApiSuccess(null)
     }
 
     // Handle wallet update modal
     const handleWalletUpdate = (user: User) => {
         setSelectedUser(user)
         setWalletUpdateOpen(true)
-        reset()
+        reset() // Reset form fields
+        setApiError(null) // Clear messages when opening sheet
+        setApiSuccess(null)
     }
 
     // Submit wallet update
     const onSubmitWalletUpdate = async (data: WalletUpdateFormData) => {
-        if (!selectedUser) return
+        if (!selectedUser) return;
 
-        setIsSubmitting(true)
-        setApiError(null)
-        setApiSuccess(null)
+        setIsSubmitting(true);
+        setApiError(null);
+        setApiSuccess(null);
 
         try {
-            const response = await axios.patch(`${API_URL}/users/${selectedUser._id}/wallet`, {
+            const response = await axios.post(`${API_URL}/users/add-balance`, {
+                userId: selectedUser._id,
                 amount: data.amount,
                 reason: data.reason,
-            })
+            });
 
             if (response.data && response.data.success) {
                 const updatedUsers = users.map((user) =>
-                    user._id === selectedUser._id ? { ...user, wallet: response.data.data.wallet } : user,
-                )
-                setUsers(updatedUsers)
-                setSelectedUser(response.data.data)
-                setApiSuccess("Wallet updated successfully")
-                toast.success("Wallet updated successfully")
-                setWalletUpdateOpen(false)
+                    user._id === selectedUser._id
+                        ? { ...user, wallet: response.data.data.wallet }
+                        : user,
+                );
+                setUsers(updatedUsers);
+                setSelectedUser(response.data.data); // Update selected user with new wallet balance
+                setApiSuccess("Wallet updated successfully!");
+                setWalletUpdateOpen(false);
             } else {
-                setApiError(response.data.message || "Failed to update wallet")
-                toast.error("Failed to update wallet")
+                setApiError(response.data.message || "Failed to update wallet.");
             }
         } catch (error) {
-            console.error("Error updating wallet:", error)
-            setApiError("An error occurred while updating wallet")
-            toast.error("Failed to update wallet")
+            console.error("Error updating wallet:", error);
+            setApiError("An error occurred while updating wallet.");
         } finally {
-            setIsSubmitting(false)
+            setIsSubmitting(false);
         }
-    }
+    };
+
 
     // Toggle user block status
     const toggleBlockUser = async (user: User) => {
+        setApiError(null) // Clear previous errors
+        setApiSuccess(null) // Clear previous success messages
         try {
             const action = user.isBlocked ? "unblock" : "block"
-            const response = await axios.patch(`${API_URL}/users/toggle-status/${user._id}`)
+            // Corrected endpoint to /users/toggle-block/:id
+            const response = await axios.patch(`${API_URL}/users/toggle-block/${user._id}`)
 
             if (response.data && response.data.success) {
                 const updatedUsers = users.map((u) => (u._id === user._id ? { ...u, isBlocked: !u.isBlocked } : u))
@@ -404,13 +377,13 @@ export default function UsersPage() {
                     setSelectedUser({ ...selectedUser, isBlocked: !selectedUser.isBlocked })
                 }
 
-                toast.success(`User ${action}ed successfully`)
+                setApiSuccess(`User ${action}ed successfully!`)
             } else {
-                toast.error(`Failed to ${action} user`)
+                setApiError(response.data.message || `Failed to ${action} user.`)
             }
         } catch (error) {
             console.error(`Error ${user.isBlocked ? "unblocking" : "blocking"} user:`, error)
-            toast.error(`Failed to ${user.isBlocked ? "unblock" : "block"} user`)
+            setApiError(`An error occurred while trying to ${user.isBlocked ? "unblock" : "block"} user.`)
         }
     }
 
@@ -465,6 +438,37 @@ export default function UsersPage() {
             </header>
 
             <main className="p-4 sm:p-6 space-y-6">
+                {/* Global API Messages */}
+                {apiError && (
+                    <div className="relative p-3 bg-red-900/50 border border-red-700 text-red-200 rounded flex items-start">
+                        <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+                        <span>{apiError}</span>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 text-red-200 hover:bg-red-800/50"
+                            onClick={() => setApiError(null)}
+                        >
+                            <XCircle className="h-4 w-4" />
+                        </Button>
+                    </div>
+                )}
+
+                {apiSuccess && (
+                    <div className="relative p-3 bg-green-900/50 border border-green-700 text-green-200 rounded flex items-start">
+                        <CheckCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+                        <span>{apiSuccess}</span>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 text-green-200 hover:bg-green-800/50"
+                            onClick={() => setApiSuccess(null)}
+                        >
+                            <XCircle className="h-4 w-4" />
+                        </Button>
+                    </div>
+                )}
+
                 {/* Search */}
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -794,22 +798,15 @@ export default function UsersPage() {
                             </div>
 
                             <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <label htmlFor="amount" className="text-sm font-medium text-gray-400">
-                                        Amount (+ to add, - to subtract)
-                                    </label>
-                                    <div className="relative">
-                                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                        <Input
-                                            {...register("amount", { valueAsNumber: true })}
-                                            type="number"
-                                            id="amount"
-                                            placeholder="Enter amount"
-                                            className="w-full h-12 pl-10 pr-4 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        />
-                                    </div>
-                                    {errors.amount && <p className="text-sm text-red-400 mt-1">{errors.amount.message}</p>}
-                                </div>
+                                <Input
+                                    {...register("amount", { valueAsNumber: true })}
+                                    type="number"
+                                    id="amount"
+                                    label="Amount (+ to add, - to subtract)"
+                                    placeholder="Enter amount"
+                                    className="w-full h-12 pl-10 pr-4 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    error={errors.amount?.message}
+                                />
 
                                 <div className="space-y-2">
                                     <label htmlFor="reason" className="text-sm font-medium text-gray-400">
