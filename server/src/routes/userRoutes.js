@@ -7,6 +7,8 @@ import {
     updateUserDetails,
     getAllUser,
     assignFranchiseToUser,
+    toggleBlockUser,
+    addBalanceToUser,
 } from "../controllers/userController.js";
 
 const router = express.Router();
@@ -18,5 +20,8 @@ router.patch("/:id", updateUserDetails); // Update User Details
 router.delete("/:id", deleteUser); // Delete User
 router.get("/", getAllUser); // Get All Users
 router.patch("/assign-franchise/:userId", assignFranchiseToUser);
+router.patch("/toggle-block/:userId", toggleBlockUser);
+router.post("/add-balance", addBalanceToUser);
+
 
 export default router;

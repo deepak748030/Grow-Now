@@ -122,6 +122,11 @@ const userSchema = new mongoose.Schema(
       ref: "Franchise",
       default: null,
     },
+    blocked: {
+      type: Boolean,
+      default: false,
+    },
+
   },
   { timestamps: true, versionKey: false }
 );

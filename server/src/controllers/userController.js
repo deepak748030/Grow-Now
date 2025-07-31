@@ -2,6 +2,7 @@ import Franchise from "../models/Franchise.js";
 import User from "../models/User.js";
 import SubscriptionOrder from "../models/SubscriptionOrders.js";
 import crypto from "crypto";
+import Transaction from "../models/Transaction.js";
 
 // Generate a unique referral code
 const generateUniqueReferralCode = async () => {
@@ -399,5 +400,71 @@ export const assignFranchiseToUser = async (req, res) => {
   } catch (error) {
     console.error("Error assigning franchise to user:", error);
     res.status(500).json({ success: false, error: "Internal Server Error" });
+  }
+};
+
+export const toggleBlockUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required." });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    user.blocked = !user.blocked;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: `User ${user.blocked ? "blocked" : "unblocked"} successfully.`,
+      data: user,
+    });
+  } catch (error) {
+    console.error("Error toggling user block status:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
+  }
+};
+
+export const addBalanceToUser = async (req, res) => {
+  try {
+    const { userId, amount, reason } = req.body;
+
+    if (!userId || !amount || !reason) {
+      return res.status(400).json({ success: false, message: "User ID, amount, and reason are required." });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    user.wallet = (user.wallet || 0) + amount;
+    await user.save();
+
+    const transaction = new Transaction({
+      userId,
+      amount,
+      type: "credit",
+      category: "addmoney",
+      status: "success",
+      title: "Balance Added",
+      description: reason,
+    });
+
+    await transaction.save();
+
+    res.status(200).json({
+      success: true,
+      message: `₹${amount} added to user's wallet successfully.`,
+      data: user,
+    });
+  } catch (error) {
+    console.error("Error adding balance to user:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
   }
 };
